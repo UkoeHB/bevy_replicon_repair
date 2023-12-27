@@ -243,6 +243,10 @@ impl Plugin for RepliconClientRepairPlugin
 {
     fn build(&self, app: &mut App)
     {
+        // disable replicon's cleanup
+        app.configure_sets(PreUpdate, ClientSet::Reset.run_if(|| false));
+
+        // set up repair cleanup
         let cleanup_prespawns = self.cleanup_prespawns;
 
         if cleanup_prespawns
