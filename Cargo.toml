@@ -1,0 +1,15 @@
+[package]
+name = "bevy_replicon_repair"
+description = "Adds client state repair to bevy_replicon for reconnects."
+authors = ["koe <ukoe@protonmail.com>"]
+version = "0.0.1"
+edition = "2021"
+keywords = ["bevy", "networking", "bevy_replicon"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/UkoeHB/bevy_replicon_repair"
+include = ["/src", "/tests", "/LICENSE*"]
+
+[dependencies]
+bevy          = { version = "0.12", default-features = false }
+bevy_replicon = { version = "0.18" }
