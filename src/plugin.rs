@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy::utils::EntityHashSet;
 use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected};
 use bevy_replicon::prelude::{
-    AppReplicationExt, ClientMapper, ClientSet, Ignored, MapNetworkEntities, Replication, RepliconTick,
+    AppReplicationExt, BufferedUpdates, ClientMapper, ClientSet, Ignored, MapNetworkEntities, Replication, RepliconTick,
     ServerEntityMap, ServerEntityTicks,
 };
 use bevy_replicon::replicon_core::replication_rules::{
@@ -87,12 +87,12 @@ fn despawn_missing_entities(
     replicon_tick  : Res<RepliconTick>,
 ){
     let replicon_tick = *replicon_tick;
-    tick_map.0.retain(
-            |(entity, tick)|
+    tick_map.retain(
+            |entity, tick|
             {
-                if tick == replicon_tick { return true; }
-                commands.add(Despawn{ entity });
-                entity_map.remove_by_client(entity);
+                if *tick == replicon_tick { return true; }
+                commands.add(Despawn{ entity: *entity });
+                entity_map.remove_by_client(*entity);
                 false
             }
         );
@@ -109,6 +109,14 @@ fn clear_prespawn_cache(mut cached: ResMut<CachedPrespawns>)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn clear_buffered_updates(mut buffered: ResMut<BufferedUpdates>)
+{
+    buffered.clear();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 /// Iterate prespawned entities, despawn if not in client entity map and not prespawned since this connection session
 /// started.
 fn despawn_failed_prespawns(
@@ -120,7 +128,7 @@ fn despawn_failed_prespawns(
     for entity in prespawned.iter()
     {
         if cached.contains(&entity) { continue; }
-        if tick_map.contains(entity) { continue; }
+        if tick_map.contains_key(&entity) { continue; }
         commands.add(Despawn{ entity });
     }
 }
@@ -254,6 +262,7 @@ impl Plugin for RepliconClientRepairPlugin
                     // state: -> Disconnected
                     (
                         clear_prespawn_cache.run_if(move || cleanup_prespawns),
+                        clear_buffered_updates,
                         detect_just_disconnected,
                         apply_state_transition::<ClientRepairState>,
                     )
