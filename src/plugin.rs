@@ -1,18 +1,23 @@
 //local shortcuts
 
 //third-party shortcuts
-use bevy::ecs::component::ComponentId;
-use bevy::ptr::Ptr;
+use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
+use bevy::utils::EntityHashSet;
+use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected};
 use bevy_replicon::prelude::{
-    ClientSet, Ignored, MapNetworkEntities, RepliconTick, ServerEntityMap, ServerEntityTicks,
-    SerializeFn, DeserializeFn, RemoveComponentFn,
+    AppReplicationExt, ClientMapper, ClientSet, Ignored, MapNetworkEntities, Replication, RepliconTick,
+    ServerEntityMap, ServerEntityTicks,
+};
+use bevy_replicon::replicon_core::replication_rules::{
+    SerializeFn, DeserializeFn, RemoveComponentFn, serialize_component, deserialize_component, remove_component,
+    deserialize_mapped_component,
 };
 use bincode::{DefaultOptions, Options};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 //standard shortcuts
-
+use std::io::Cursor;
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -26,7 +31,7 @@ impl Default for ComponentRepairRules { fn default() -> Self { Self(Vec::default
 //-------------------------------------------------------------------------------------------------------------------
 
 #[derive(Resource, Default, Deref, DerefMut)]
-struct CachedPrespawns(HashSet<Entity>);
+struct CachedPrespawns(EntityHashSet<Entity>);
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -42,33 +47,33 @@ fn collect_prespawns(mut cached_prespawns: ResMut<CachedPrespawns>, prespawns: Q
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_just_disconnected(mut next: NextState<ClientRepairState>)
+fn detect_just_disconnected(mut next: ResMut<NextState<ClientRepairState>>)
 {
-    *next = ClientRepairState::Disconnected;
+    next.set(ClientRepairState::Disconnected);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_waiting(mut next: NextState<ClientRepairState>)
+fn detect_waiting(mut next: ResMut<NextState<ClientRepairState>>)
 {
-    *next = ClientRepairState::Waiting;
+    next.set(ClientRepairState::Waiting);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_first_replication(mut next: NextState<ClientRepairState>)
+fn detect_first_replication(mut next: ResMut<NextState<ClientRepairState>>)
 {
-    *next = ClientRepairState::Repairing;
+    next.set(ClientRepairState::Repairing);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn finish_repair(mut next: NextState<ClientRepairState>)
+fn finish_repair(mut next: ResMut<NextState<ClientRepairState>>)
 {
-    *next = ClientRepairState::Done;
+    next.set(ClientRepairState::Done);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -81,12 +86,12 @@ fn despawn_missing_entities(
     mut entity_map : ResMut<ServerEntityMap>,
     replicon_tick  : Res<RepliconTick>,
 ){
-    let replicon_tick = **replicon_tick;
+    let replicon_tick = *replicon_tick;
     tick_map.0.retain(
             |(entity, tick)|
             {
                 if tick == replicon_tick { return true; }
-                commands.despawn(entity);
+                commands.add(Despawn{ entity });
                 entity_map.remove_by_client(entity);
                 false
             }
@@ -114,9 +119,9 @@ fn despawn_failed_prespawns(
 ){
     for entity in prespawned.iter()
     {
-        if cached.contains(entity) { continue; }
+        if cached.contains(&entity) { continue; }
         if tick_map.contains(entity) { continue; }
-        commands.despawn(entity);
+        commands.add(Despawn{ entity });
     }
 }
 
@@ -133,11 +138,11 @@ fn cleanup_entity_components(
         commands.add(
             move |world: &mut World|
             {
-                let rules = world.remove_resource::<ComponentRepairRules>();
+                let rules = world.remove_resource::<ComponentRepairRules>().unwrap();
                 for rule in rules.iter()
                 {
-                    let Some(entity) = world.get_entity_mut(entity) else { return; };
-                    (rule)(&mut entity);
+                    let Some(mut entity) = world.get_entity_mut(entity) else { return; };
+                    (*rule)(&mut entity);
                 }
                 world.insert_resource(rules);
             }
@@ -150,9 +155,9 @@ fn cleanup_entity_components(
 
 /// Tracks the sequence of events leading up to replication repair.
 ///
-/// Note that the state will only leave `Dormant` after the first client disconnect. This ensures repair will not
-/// be run spuriously for the first connection session.
-#[derive(State, Default)]
+/// The state will only leave `Dormant` after the first client disconnect. This ensures repair will not
+/// run needlessly for the first connection session.
+#[derive(States, Default, Debug, Hash, Eq, PartialEq, Copy, Clone)]
 pub enum ClientRepairState
 {
     /// The client is in its initial connection session.
@@ -179,6 +184,9 @@ pub struct Prespawned;
 
 //-------------------------------------------------------------------------------------------------------------------
 
+#[derive(SystemSet, Debug, Default, Copy, Clone, Hash, Eq, PartialEq)]
+pub struct ClientRepairSet;
+
 /// Adds client repair functionality to a client app that uses `bevy_replicon`.
 /// - Despawns replicated entities that fail to re-replicate after a reconnect.
 /// - Despawns [`Prespawned`] entities that fail to replicate after a reconnect (optional).
@@ -188,8 +196,9 @@ pub struct Prespawned;
 /// entities. There are a couple points to keep in mind:
 /// - After the client state is repaired, `Added` or `Changed` filters will be triggered for replicated components that
 ///   use the default deserializer, even if a replicated component's value did not change on the server since before
-///   the reconnect. If you want to avoid this, use the TODO deserializer for `Eq` components that detects when
-///   the client app is in state [`ClientRepairState::Repairing`] and doesn't write component data if it won't change.
+///   the reconnect.
+///   If you want to avoid this, use the [`deserialize_eq_component`] and [`deserialize_mapped_eq_component`]
+///   deserializers for `Eq` components that doesn't write component data if it won't change.
 /// - Since `bevy_replicon` allows you to define custom deserializers for replicated components, we allow you to
 ///   register custom component-removal systems which will run on all replicated entities during repair.
 ///   This is a heavy-handed approach, because if a client adds a replicated component to a replicated entity in their
@@ -235,7 +244,7 @@ impl Plugin for RepliconClientRepairPlugin
 
         app.add_state::<ClientRepairState>()
             .init_resource::<ComponentRepairRules>()
-            .configure_set(PreUpdate,
+            .configure_sets(PreUpdate,
                 ClientRepairSet
                     .after(ClientSet::Receive)
                     .run_if(resource_exists::<RepliconTick>())
@@ -246,14 +255,14 @@ impl Plugin for RepliconClientRepairPlugin
                     (
                         clear_prespawn_cache.run_if(move || cleanup_prespawns),
                         detect_just_disconnected,
-                        apply_state_transition::<ClientRepairState>(),
+                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
-                        .run_if(client_just_disconnected())
+                        .run_if(client_just_disconnected()),
                     // state: Disconnected -> Waiting
                     (
                         detect_waiting,
-                        apply_state_transition::<ClientRepairState>(),
+                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
                         .run_if(client_connecting().or_else(client_just_connected()))
@@ -261,7 +270,7 @@ impl Plugin for RepliconClientRepairPlugin
                     // state: Waiting -> Repairing
                     (
                         detect_first_replication,
-                        apply_state_transition::<ClientRepairState>(),
+                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
                         .run_if(in_state(ClientRepairState::Waiting))
@@ -281,7 +290,7 @@ impl Plugin for RepliconClientRepairPlugin
                         cleanup_entity_components,
                         apply_deferred,
                         finish_repair,
-                        apply_state_transition::<ClientRepairState>(),
+                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
                         .run_if(in_state(ClientRepairState::Repairing))
@@ -291,10 +300,10 @@ impl Plugin for RepliconClientRepairPlugin
             )
             .add_systems(Last,
                 collect_prespawns
-                    .run_if(move || cleanup_prespawns),
+                    .run_if(move || cleanup_prespawns)
                     .run_if(in_state(ClientRepairState::Waiting))
                     .in_set(ClientRepairSet)
-            )
+            );
     }
 }
 
@@ -317,7 +326,7 @@ pub type RepairComponentFn = fn(&mut EntityWorldMut);
 /// to it.
 pub fn repair_component<C: Component>(entity: &mut EntityWorldMut)
 {
-    let world_tick = entity.world_mut().change_tick();
+    let world_tick = unsafe { entity.world_mut().change_tick() };
 
     // check if the component is ignored from replication
     if entity.contains::<Ignored<C>>() { return; };
@@ -326,9 +335,55 @@ pub fn repair_component<C: Component>(entity: &mut EntityWorldMut)
     let Some(change_ticks) = entity.get_change_ticks::<C>() else { return; };
 
     // check if the component was mutated this tick, indicating it was replicated this tick
-    if change_ticks.last_change_tick() == world_tick { return; }
+    if change_ticks.last_changed_tick() == world_tick { return; }
 
     entity.remove::<C>();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+
+/// Default deserialization function, with an equality check before writing to the entity.
+pub fn deserialize_eq_component<C: Component + DeserializeOwned + Eq>(
+    entity         : &mut EntityWorldMut,
+    _entity_map    : &mut ServerEntityMap,
+    cursor         : &mut Cursor<&[u8]>,
+    _replicon_tick : RepliconTick,
+) -> bincode::Result<()>
+{
+    let component: C = DefaultOptions::new().deserialize_from(cursor)?;
+    if let Some(existing) = entity.get::<C>()
+    {
+        if *existing == component { return Ok(()); }
+    }
+    entity.insert(component);
+
+    Ok(())
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+
+/// Like [`deserialize_eq_component`], but also maps entities before insertion.
+pub fn deserialize_mapped_eq_component<C: Component + DeserializeOwned + MapNetworkEntities + Eq>(
+    entity         : &mut EntityWorldMut,
+    entity_map     : &mut ServerEntityMap,
+    cursor         : &mut Cursor<&[u8]>,
+    _replicon_tick : RepliconTick,
+) -> bincode::Result<()>
+{
+    let mut component: C = DefaultOptions::new().deserialize_from(cursor)?;
+
+    entity.world_scope(|world| {
+        component.map_entities(&mut ClientMapper::new(world, entity_map));
+    });
+
+    if let Some(existing) = entity.get::<C>()
+    {
+        if *existing == component { return Ok(()); }
+    }
+
+    entity.insert(component);
+
+    Ok(())
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -366,11 +421,11 @@ impl AppReplicationRepairExt for App {
         C: Component + Serialize + DeserializeOwned,
     {
         self.replicate_repair_with::<C>(
-                serialize_component,
-                deserialize_component,
-                remove_component,
-                repair_component,
-            );
+                serialize_component::<C>,
+                deserialize_component::<C>,
+                remove_component::<C>,
+                repair_component::<C>,
+            )
     }
 
     fn replicate_repair_mapped<C>(&mut self) -> &mut Self
@@ -378,11 +433,11 @@ impl AppReplicationRepairExt for App {
         C: Component + Serialize + DeserializeOwned + MapNetworkEntities,
     {
         self.replicate_repair_with::<C>(
-                serialize_component,
-                deserialize_mapped_component,
-                remove_component,
-                repair_component,
-            );
+                serialize_component::<C>,
+                deserialize_mapped_component::<C>,
+                remove_component::<C>,
+                repair_component::<C>,
+            )
     }
 
     fn replicate_repair_with<C>(
@@ -395,8 +450,8 @@ impl AppReplicationRepairExt for App {
     where
         C: Component,
     {
-        self.replicate_with(serialize, deserialize, remove);
-        self.world.get_resource_mut::<ComponentRepairRules>().push(repair);
+        self.replicate_with::<C>(serialize, deserialize, remove);
+        self.world.resource_mut::<ComponentRepairRules>().push(repair);
 
         self
     }
