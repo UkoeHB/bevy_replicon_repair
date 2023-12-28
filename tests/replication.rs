@@ -15,10 +15,12 @@ use serde::{Deserialize, Serialize};
 
 
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 
-#[derive(Component, Eq, PartialEq, Serialize, Deserialize)]
-struct DummyComponent;
+#[derive(Component, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+struct BasicComponent(usize);
 
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 // normal replication works with new app extension
@@ -38,12 +40,12 @@ fn normal_replication()
                 cleanup_prespawns: false,
             },
         ))
-        .replicate_repair::<DummyComponent>();
+        .replicate_repair::<BasicComponent>();
     }
 
     common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, DummyComponent));
+    server_app.world.spawn((Replication, BasicComponent::default()));
 
     server_app.update();
     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -51,7 +53,7 @@ fn normal_replication()
 
     let _client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<DummyComponent>)>()
+        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 }
@@ -75,13 +77,13 @@ fn entity_persists()
                 cleanup_prespawns: false,
             },
         ))
-        .replicate_repair::<DummyComponent>();
+        .replicate_repair::<BasicComponent>();
     }
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, DummyComponent));
+    server_app.world.spawn((Replication, BasicComponent::default()));
 
     server_app.update();
     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -89,7 +91,7 @@ fn entity_persists()
 
     let initial_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<DummyComponent>)>()
+        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 
@@ -106,7 +108,7 @@ fn entity_persists()
 
     let new_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<DummyComponent>)>()
+        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(new_client_entity, initial_client_entity);
     assert_eq!(client_app.world.entities().len(), 1);
@@ -118,7 +120,62 @@ fn entity_persists()
 #[test]
 fn disconnect_component_mutation_travels()
 {
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+    for app in [&mut server_app, &mut client_app] {
+        app.add_plugins((
+            MinimalPlugins,
+            ReplicationPlugins.set(ServerPlugin {
+                tick_policy: TickPolicy::EveryFrame,
+                ..Default::default()
+            }),
+            RepliconClientRepairPlugin{
+                cleanup_prespawns: false,
+            },
+        ))
+        .replicate_repair::<BasicComponent>();
+    }
 
+    // initial connection
+    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+
+    server_app.world.spawn((Replication, BasicComponent::default()));
+
+    server_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    client_app.update();
+
+    let initial_client_entity = client_app
+        .world
+        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .single(&client_app.world);
+    assert_eq!(client_app.world.entities().len(), 1);
+
+    // disconnect
+    client_app.world.resource_mut::<RenetClient>().disconnect();
+    client_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.update();
+    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+
+    // mutate component
+    let mut component = server_app
+        .world
+        .query_filtered::<&mut BasicComponent, With<Replication>>()
+        .single_mut(&mut server_app.world);
+    *component = BasicComponent(1);
+
+    // reconnect
+    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+
+    let (new_client_entity, component) = client_app
+        .world
+        .query_filtered::<(Entity, &BasicComponent), With<Replication>>()
+        .single(&client_app.world);
+    assert_eq!(new_client_entity, initial_client_entity);
+    assert_eq!(*component, BasicComponent(1));
+    assert_eq!(client_app.world.entities().len(), 1);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
