@@ -1,6 +1,7 @@
 //local shortcuts
 
 //third-party shortcuts
+use bevy::ecs::component::Tick;
 use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
 use bevy::utils::EntityHashSet;
@@ -36,12 +37,29 @@ struct CachedPrespawns(EntityHashSet<Entity>);
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+#[derive(Resource, Deref, DerefMut)]
+struct RepairChangeTickTracker(Tick);
+
+impl Default for RepairChangeTickTracker { fn default() -> Self { Self(Tick::new(0)) } }
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 fn collect_prespawns(mut cached_prespawns: ResMut<CachedPrespawns>, prespawns: Query<Entity, Added<Prespawned>>)
 {
     for prespawn in prespawns.iter()
     {
         let _ = cached_prespawns.insert(prespawn);
     }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn collect_world_change_tick(world: &mut World)
+{
+    let world_tick = world.change_tick();
+    **world.resource_mut::<RepairChangeTickTracker>() = world_tick;
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -140,7 +158,9 @@ fn despawn_failed_prespawns(
 fn cleanup_entity_components(
     mut commands : Commands,
     replicated   : Query<Entity, With<Replication>>,
+    preinit_tick : Res<RepairChangeTickTracker>,
 ){
+    let preinit_tick = **preinit_tick;
     for entity in replicated.iter()
     {
         commands.add(
@@ -150,7 +170,7 @@ fn cleanup_entity_components(
                 for rule in rules.iter()
                 {
                     let Some(mut entity) = world.get_entity_mut(entity) else { return; };
-                    (*rule)(&mut entity);
+                    (*rule)(&mut entity, preinit_tick);
                 }
                 world.insert_resource(rules);
             }
@@ -256,10 +276,16 @@ impl Plugin for RepliconClientRepairPlugin
 
         app.add_state::<ClientRepairState>()
             .init_resource::<ComponentRepairRules>()
+            .init_resource::<RepairChangeTickTracker>()
             .configure_sets(PreUpdate,
                 ClientRepairSet
                     .after(ClientSet::Receive)
                     .run_if(resource_exists::<RepliconTick>())
+            )
+            .add_systems(PreUpdate,
+                collect_world_change_tick
+                    .before(ClientSet::Receive)
+                    .run_if(not(in_state(ClientRepairState::Dormant)))
             )
             .add_systems(PreUpdate,
                 (
@@ -323,7 +349,10 @@ impl Plugin for RepliconClientRepairPlugin
 //-------------------------------------------------------------------------------------------------------------------
 
 /// Signature of component repair functions.
-pub type RepairComponentFn = fn(&mut EntityWorldMut);
+///
+/// We pass in a world change tick from before the first server init message for the current session.
+/// This can be used to detect component changes caused by replication, which indicates a component was replicated.
+pub type RepairComponentFn = fn(&mut EntityWorldMut, Tick);
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -337,7 +366,7 @@ pub type RepairComponentFn = fn(&mut EntityWorldMut);
 ///
 /// You can disable this function for an entity by adding an [`Ignored<C>`](bevy_replicon::prelude::Ignored) component
 /// to it.
-pub fn repair_component<C: Component>(entity: &mut EntityWorldMut)
+pub fn repair_component<C: Component>(entity: &mut EntityWorldMut, preinit_tick: Tick)
 {
     let world_tick = unsafe { entity.world_mut().change_tick() };
 
@@ -347,8 +376,8 @@ pub fn repair_component<C: Component>(entity: &mut EntityWorldMut)
     // check if the component exists on the entity
     let Some(change_ticks) = entity.get_change_ticks::<C>() else { return; };
 
-    // check if the component was mutated this tick, indicating it was replicated this tick
-    if change_ticks.last_changed_tick() == world_tick { return; }
+    // check if the component was mutated by the most recent replication message
+    if change_ticks.is_changed(preinit_tick, world_tick) { return; }
 
     entity.remove::<C>();
 }
