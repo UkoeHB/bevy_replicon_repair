@@ -7,18 +7,17 @@ use bevy::prelude::*;
 use bevy::utils::EntityHashSet;
 use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected};
 use bevy_replicon::prelude::{
-    AppReplicationExt, BufferedUpdates, ClientMapper, ClientSet, Ignored, MapNetworkEntities, Replication, RepliconTick,
+    AppReplicationExt, BufferedUpdates, ClientSet, Ignored, MapNetworkEntities, Replication, RepliconTick,
     ServerEntityMap, ServerEntityTicks,
 };
 use bevy_replicon::replicon_core::replication_rules::{
     SerializeFn, DeserializeFn, RemoveComponentFn, serialize_component, deserialize_component, remove_component,
     deserialize_mapped_component,
 };
-use bincode::{DefaultOptions, Options};
 use serde::{de::DeserializeOwned, Serialize};
 
 //standard shortcuts
-use std::io::Cursor;
+
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -222,16 +221,16 @@ pub struct ClientRepairSet;
 ///
 /// The goal of this plugin is to streamline client reconnects as much as possible by preserving existing client
 /// entities. There are a couple points to keep in mind:
-/// - After the client state is repaired, `Added` or `Changed` filters will be triggered for replicated components that
+/// - After the client state is repaired, `Changed` filters will be triggered for replicated components that
 ///   use the default deserializer, even if a replicated component's value did not change on the server since before
 ///   the reconnect.
-///   If you want to avoid this, use the [`deserialize_eq_component`] and [`deserialize_mapped_eq_component`]
-///   deserializers for `Eq` components that doesn't write component data if it won't change.
+///   We use change detection to remove dead replicated components, so with the current design this is unavoidable.
 /// - Since `bevy_replicon` allows you to define custom deserializers for replicated components, we allow you to
 ///   register custom component-removal systems which will run on all replicated entities during repair.
 ///   This is a heavy-handed approach, because if a client adds a replicated component to a replicated entity in their
 ///   own system (e.g. they add `Transform` in reaction to a replicated blueprint, and also register `Transform` as
 ///   a component that can be replicated), then the component-removal systems may remove it from the entity erroneously.
+///   See [`repair_component`] for how to selectively disable it and avoid that problem.
 #[derive(Debug)]
 pub struct RepliconClientRepairPlugin
 {
@@ -380,52 +379,6 @@ pub fn repair_component<C: Component>(entity: &mut EntityWorldMut, preinit_tick:
     if change_ticks.is_changed(preinit_tick, world_tick) { return; }
 
     entity.remove::<C>();
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-
-/// Default deserialization function, with an equality check before writing to the entity.
-pub fn deserialize_eq_component<C: Component + DeserializeOwned + Eq>(
-    entity         : &mut EntityWorldMut,
-    _entity_map    : &mut ServerEntityMap,
-    cursor         : &mut Cursor<&[u8]>,
-    _replicon_tick : RepliconTick,
-) -> bincode::Result<()>
-{
-    let component: C = DefaultOptions::new().deserialize_from(cursor)?;
-    if let Some(existing) = entity.get::<C>()
-    {
-        if *existing == component { return Ok(()); }
-    }
-    entity.insert(component);
-
-    Ok(())
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-
-/// Like [`deserialize_eq_component`], but also maps entities before insertion.
-pub fn deserialize_mapped_eq_component<C: Component + DeserializeOwned + MapNetworkEntities + Eq>(
-    entity         : &mut EntityWorldMut,
-    entity_map     : &mut ServerEntityMap,
-    cursor         : &mut Cursor<&[u8]>,
-    _replicon_tick : RepliconTick,
-) -> bincode::Result<()>
-{
-    let mut component: C = DefaultOptions::new().deserialize_from(cursor)?;
-
-    entity.world_scope(|world| {
-        component.map_entities(&mut ClientMapper::new(world, entity_map));
-    });
-
-    if let Some(existing) = entity.get::<C>()
-    {
-        if *existing == component { return Ok(()); }
-    }
-
-    entity.insert(component);
-
-    Ok(())
 }
 
 //-------------------------------------------------------------------------------------------------------------------
