@@ -39,7 +39,7 @@ fn normal_replication()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconClientRepairPlugin{
+            RepliconRepairPluginClient{
                 cleanup_prespawns: false,
             },
         ))
@@ -76,7 +76,7 @@ fn entity_persists()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconClientRepairPlugin{
+            RepliconRepairPluginClient{
                 cleanup_prespawns: false,
             },
         ))
@@ -132,7 +132,7 @@ fn disconnect_component_mutation_travels()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconClientRepairPlugin{
+            RepliconRepairPluginClient{
                 cleanup_prespawns: false,
             },
         ))
@@ -196,7 +196,7 @@ fn disconenct_component_removal_travels()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconClientRepairPlugin{
+            RepliconRepairPluginClient{
                 cleanup_prespawns: false,
             },
         ))
@@ -265,7 +265,7 @@ fn disconnect_despawn_travels()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconClientRepairPlugin{
+            RepliconRepairPluginClient{
                 cleanup_prespawns: false,
             },
         ))
