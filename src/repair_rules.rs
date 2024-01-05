@@ -13,6 +13,8 @@ use bevy::prelude::*;
 ///
 /// We pass in a world change tick from before the first server init message for the current session.
 /// This can be used to detect component changes caused by replication, which indicates a component was replicated.
+///
+/// See [`repair_component`](crate::repair_component) for the default implementation.
 pub type RepairComponentFn = fn(&mut EntityWorldMut, Tick);
 
 //-------------------------------------------------------------------------------------------------------------------

@@ -6,7 +6,7 @@ use bevy::ecs::component::Tick;
 use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
 use bevy::utils::EntityHashSet;
-use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected};
+use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected, RenetReceive};
 use bevy_replicon::prelude::{
     BufferedUpdates, ClientSet, Replication, RepliconTick,
     ServerEntityMap, ServerEntityTicks,
@@ -37,6 +37,17 @@ fn collect_prespawns(mut cached_prespawns: ResMut<CachedPrespawns>, prespawns: Q
     for prespawn in prespawns.iter()
     {
         let _ = cached_prespawns.insert(prespawn);
+    }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn clean_dead_prespawns(mut cached_prespawns: ResMut<CachedPrespawns>, mut despawns: RemovedComponents<Prespawned>)
+{
+    for prespawn in despawns.read()
+    {
+        let _ = cached_prespawns.remove(&prespawn);
     }
 }
 
@@ -193,7 +204,7 @@ pub enum ClientRepairState
 /// Marker component for entities prespawned on a client that are expected to be replicated by the server.
 ///
 /// This component should be added to all prespawned entities that you want to be auto-cleaned up by
-/// [`RepliconRepairPluginClient`] after a reconnect.
+/// [`RepliconRepairPluginClient`] after a reconnect if the server fails to replicate them.
 #[derive(Component, Debug, Default, Copy, Clone)]
 pub struct Prespawned;
 
@@ -212,13 +223,13 @@ pub struct ClientRepairSet;
 /// - After the client state is repaired, `Changed` filters will be triggered for replicated components that
 ///   use the default deserializer, even if a replicated component's value did not change on the server since before
 ///   the reconnect.
-///   We use change detection to remove dead replicated components, so with the current design this is unavoidable.
-/// - Since `bevy_replicon` allows you to define custom deserializers for replicated components, we allow you to
-///   register custom component-removal systems which will run on all replicated entities during repair.
+///   We remove dead replicated components by leveraging change detection, so with the current design triggering `Changed`
+///   is unavoidable.
+/// - We allow you to register custom component-removal systems which will run on all replicated entities during repair.
 ///   This is a heavy-handed approach, because if a client adds a replicated component to a replicated entity in their
 ///   own system (e.g. they add `Transform` in reaction to a replicated blueprint, and also register `Transform` as
 ///   a component that can be replicated), then the component-removal systems may remove it from the entity erroneously.
-///   See [`repair_component`] for how to selectively disable it and avoid that problem.
+///   See [`repair_component`] for how to selectively disable component removal.
 #[derive(Debug)]
 pub struct RepliconRepairPluginClient
 {
@@ -231,13 +242,13 @@ pub struct RepliconRepairPluginClient
     /// This is because entities prespawned in the current session may have successfully landed on the server but not
     /// yet been replicated (due to a race condition between client-sent events and the server's first replication
     /// message).
-    /// - **Caveat**: You should only spawn [`Prespawned`] entities after your system that initializes/reinitializes your
+    /// - You should only spawn [`Prespawned`] entities after your system that initializes/reinitializes your
     ///   renet client.
     ///   Entities spawned before that system will be considered 'spawned in the current
-    ///   session' even if spawned when renet is disconnected.
+    ///   session' even if the client mappings were sent to a dead renet client.
     ///   As a result, we won't despawn them if they fail to be replicated in the first server replication
     ///   message.
-    ///   Also, if you spawn entities in schedule `Last`, do so before the [`ClientRepairSet`] otherwise we
+    /// - If you spawn entities in schedule `Last`, do so before the [`ClientRepairSet`] otherwise we
     ///   won't track them for cleanup.
     ///
     /// Note that in general it is possible for a server to reject a client request to spawn an entity. This means
@@ -271,6 +282,7 @@ impl Plugin for RepliconRepairPluginClient
             )
             .add_systems(PreUpdate,
                 collect_world_change_tick
+                    .after(RenetReceive)
                     .before(ClientSet::Receive)
                     .run_if(not(in_state(ClientRepairState::Dormant)))
             )
@@ -291,7 +303,7 @@ impl Plugin for RepliconRepairPluginClient
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
-                        .run_if(client_connecting().or_else(client_just_connected()))
+                        .run_if(client_just_connected().or_else(client_connecting()))
                         .run_if(in_state(ClientRepairState::Disconnected)),
                     // state: Waiting -> Repairing
                     (
@@ -325,7 +337,11 @@ impl Plugin for RepliconRepairPluginClient
                     .in_set(ClientRepairSet)
             )
             .add_systems(Last,
-                collect_prespawns
+                (
+                    clean_dead_prespawns,
+                    collect_prespawns,
+                )
+                    .chain()
                     .run_if(move || cleanup_prespawns)
                     .run_if(in_state(ClientRepairState::Waiting))
                     .in_set(ClientRepairSet)

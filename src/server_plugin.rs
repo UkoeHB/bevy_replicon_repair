@@ -1,16 +1,11 @@
 //local shortcuts
-use crate::*;
 
 //third-party shortcuts
-use bevy::ecs::component::Tick;
-use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
-use bevy::utils::EntityHashSet;
-use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected};
-use bevy_replicon::prelude::{
-    BufferedUpdates, ClientSet, Replication, RepliconTick,
-    ServerEntityMap, ServerEntityTicks,
-};
+use bevy::utils::EntityHashMap;
+use bevy_replicon::RenetReceive;
+use bevy_replicon::renet::{ClientId, ServerEvent};
+use bevy_replicon::prelude::{ClientEntityMap, ClientMapping, Replication, RepliconTick, ServerSet};
 
 //standard shortcuts
 
@@ -31,8 +26,9 @@ fn collect_client_map(mut cached: ResMut<CachedClientMap>, mapped: Res<ClientEnt
     {
         for mapping in mappings.iter()
         {
-            if cached.insert(mapping.server_entity, (client_id, mapping.client_entity)).is_some()
-            { tracing::error!(client_id, ?mapping, "overwriting cached client mapping"); }
+            // only one server <-> client entity mapping is currently supported per server entity
+            if cached.insert(mapping.server_entity, (*client_id, mapping.client_entity)).is_some()
+            { tracing::error!(?client_id, ?mapping, "overwriting cached client mapping"); }
         }
     }
 }
@@ -40,8 +36,11 @@ fn collect_client_map(mut cached: ResMut<CachedClientMap>, mapped: Res<ClientEnt
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn copy_client_map(mut events: EventReader<ServerEvent>, mut mapped: ResMut<ClientEntityMap>, cached: Res<CachedClientMap>)
-{
+fn return_client_map(
+    mut events : EventReader<ServerEvent>,
+    mut mapped : ResMut<ClientEntityMap>,
+    cached     : Res<CachedClientMap>
+){
     for event in events.read()
     {
         match event
@@ -51,9 +50,7 @@ fn copy_client_map(mut events: EventReader<ServerEvent>, mut mapped: ResMut<Clie
                 for (server_entity, (mapped_client_id, client_entity)) in cached.iter()
                 {
                     if client_id != mapped_client_id { continue; }
-                    mapped.entry(client_id)
-                        .or_default()
-                        .push(ClientMapping{ server_entity, client_entity });
+                    mapped.insert(*client_id, ClientMapping{ server_entity: *server_entity, client_entity: *client_entity });
                 }
             }
             _ => (),
@@ -70,7 +67,7 @@ fn clean_client_map(mut cached: ResMut<CachedClientMap>, mut despawns: RemovedCo
     {
         if let Some((client_id, client_entity)) = cached.remove(&server_entity)
         {
-            tracing::trace!(client_id, server_entity, client_entity,
+            tracing::trace!(?client_id, ?server_entity, ?client_entity,
                 "removing despawned server entity from cached client-entity map");
         }
     }
@@ -82,6 +79,12 @@ fn clean_client_map(mut cached: ResMut<CachedClientMap>, mut despawns: RemovedCo
 #[derive(SystemSet, Debug, Default, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct ServerRepairSet;
 
+/// Adds client repair functionality to a server app that uses `bevy_replicon`.
+/// - Preserves client entity mappings for disconnected clients.
+///   This is most useful for repairing entity mappings when a client prespawn notification is applied on the server
+///   but then the client disconnects before it can receive the replicated server entity.
+///   Since the client won't have the mapping, we need to link the server entity to the client entity after the client
+///   reconnects so the client doesn't end up with a dangling prespawned entity.
 #[derive(Debug)]
 pub struct RepliconRepairPluginServer;
 
@@ -89,72 +92,24 @@ impl Plugin for RepliconRepairPluginServer
 {
     fn build(&self, app: &mut App)
     {
-        app.add_state::<ClientRepairState>()
-            .init_resource::<CachedClientMap>()
-            .configure_sets(PreUpdate,
+        app.init_resource::<CachedClientMap>()
+            .configure_sets(PostUpdate,
                 ServerRepairSet
-                    .after(ClientSet::Receive)
+                    .after(RenetReceive)
                     .run_if(resource_exists::<RepliconTick>())
             )
             .add_systems(PreUpdate,
-                collect_world_change_tick
-                    .before(ClientSet::Receive)
-                    .run_if(not(in_state(ClientRepairState::Dormant)))
-            )
-            .add_systems(PreUpdate,
                 (
-                    // state: -> Disconnected
-                    (
-                        clear_prespawn_cache.run_if(move || cleanup_prespawns),
-                        clear_buffered_updates,
-                        detect_just_disconnected,
-                        apply_state_transition::<ClientRepairState>,
-                    )
-                        .chain()
-                        .run_if(client_just_disconnected()),
-                    // state: Disconnected -> Waiting
-                    (
-                        detect_waiting,
-                        apply_state_transition::<ClientRepairState>,
-                    )
-                        .chain()
-                        .run_if(client_connecting().or_else(client_just_connected()))
-                        .run_if(in_state(ClientRepairState::Disconnected)),
-                    // state: Waiting -> Repairing
-                    (
-                        detect_first_replication,
-                        apply_state_transition::<ClientRepairState>,
-                    )
-                        .chain()
-                        .run_if(in_state(ClientRepairState::Waiting))
-                        .run_if(resource_changed::<RepliconTick>()),
-                    // repair
-                    // state: Repairing -> Done
-                    (
-                        despawn_missing_entities,
-                        apply_deferred,
-                        (
-                            despawn_failed_prespawns,
-                            clear_prespawn_cache,
-                            apply_deferred,
-                        )
-                            .chain()
-                            .run_if(move || cleanup_prespawns),
-                        cleanup_entity_components,
-                        apply_deferred,
-                        finish_repair,
-                        apply_state_transition::<ClientRepairState>,
-                    )
-                        .chain()
-                        .run_if(in_state(ClientRepairState::Repairing))
+                    // collect the current map before replicon cleans it in response to disconnects
+                    collect_client_map.before(ServerSet::Receive),
+                    // clean immediately before repairing the client map to avoid missing despawns
+                    clean_client_map,
+                    // return existing client mappings as soon as a client connection is detected
+                    // - We do this after the replicon receive set in case a disconnect and connect event show up
+                    //   in the same tick (this would be a bug, but we want to be defensive here).
+                    return_client_map.after(ServerSet::Receive),
                 )
                     .chain()
-                    .in_set(ServerRepairSet)
-            )
-            .add_systems(Last,
-                collect_prespawns
-                    .run_if(move || cleanup_prespawns)
-                    .run_if(in_state(ClientRepairState::Waiting))
                     .in_set(ServerRepairSet)
             );
     }

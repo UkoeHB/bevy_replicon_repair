@@ -4,7 +4,7 @@ use crate::*;
 //third-party shortcuts
 use bevy::ecs::component::Tick;
 use bevy::prelude::*;
-use bevy_replicon::prelude::{AppReplicationExt, Ignored, MapNetworkEntities};
+use bevy_replicon::prelude::{AppReplicationExt, MapNetworkEntities};
 use bevy_replicon::replicon_core::replication_rules::{
     SerializeFn, DeserializeFn, RemoveComponentFn, serialize_component, deserialize_component, remove_component,
     deserialize_mapped_component,
@@ -21,11 +21,10 @@ use serde::{de::DeserializeOwned, Serialize};
 /// The component `C` will be removed from `entity` if the component was not added/changed on the entity in the repair
 /// tick.
 ///
-/// If you manually added/changed the component on the entity in the repair tick, it may be erroneously left alone.
+/// If you manually added/changed the component on the entity in the repair tick, it may be erroneously left in place.
 /// Likewise, if you are not replicating the component and instead manually inserted it, it may be erroneously removed.
 ///
-/// You can disable this function for an entity by adding an [`Ignored<C>`](bevy_replicon::prelude::Ignored) component
-/// to it.
+/// You can disable this function for an entity by adding an [`Ignored<C>`](crate::Ignored) component to it on the client.
 pub fn repair_component<C: Component>(entity: &mut EntityWorldMut, preinit_tick: Tick)
 {
     let world_tick = unsafe { entity.world_mut().change_tick() };
@@ -53,7 +52,7 @@ pub trait AppReplicationRepairExt
         C: Component + Serialize + DeserializeOwned;
 
     /// Mirrors [`AppReplicationExt::replicate_mapped`](bevy_replicon::prelude::AppReplicationExt) using the default
-    /// component-removal repair function.
+    /// component-removal repair function [`repair_component`].
     fn replicate_repair_mapped<C>(&mut self) -> &mut Self
     where
         C: Component + Serialize + DeserializeOwned + MapNetworkEntities;

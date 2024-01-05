@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use bevy::utils::EntityHashSet;
 use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected};
 use bevy_replicon::prelude::{
-    AppReplicationExt, BufferedUpdates, ClientMapper, ClientSet, Ignored, MapNetworkEntities, Replication, RepliconTick,
+    AppReplicationExt, BufferedUpdates, ClientMapper, ClientSet, MapNetworkEntities, Replication, RepliconTick,
     ServerEntityMap, ServerEntityTicks,
 };
 use bevy_replicon::replicon_core::replication_rules::{
