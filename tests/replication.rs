@@ -175,7 +175,7 @@ fn disconnect_component_mutation_travels()
 
 // component removal during disconnect is mirrored on the replicated entity after a reconnect
 #[test]
-fn disconenct_component_removal_travels()
+fn disconnect_component_removal_travels()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
@@ -190,26 +190,23 @@ fn disconenct_component_removal_travels()
                 cleanup_prespawns: false,
             },
         ))
-        .replicate_repair::<BasicComponent>()
-        .replicate_repair::<DummyComponent>();
+        .replicate_repair::<BasicComponent>();
     }
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
 
     server_app.world.spawn((Replication, BasicComponent::default()));
-    //todo: this is needed because replicon won't replicate an empty entity, so no init message will be sent on reconnect
-    server_app.world.spawn((Replication, DummyComponent));
 
     server_app.update();
     std::thread::sleep(std::time::Duration::from_millis(50));
     client_app.update();
 
-    let _initial_client_entity = client_app
+    let initial_client_entity = client_app
         .world
         .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
         .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 2);
+    assert_eq!(client_app.world.entities().len(), 1);
 
     // disconnect
     client_app.world.resource_mut::<RenetClient>().disconnect();
@@ -229,15 +226,12 @@ fn disconenct_component_removal_travels()
     common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
     assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
 
-//todo: this fails
-/*
     let new_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, Without<BasicComponent>, Without<DummyComponent>)>()
+        .query_filtered::<Entity, (With<Replication>, Without<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(new_client_entity, initial_client_entity);
-    assert_eq!(client_app.world.entities().len(), 2);
-*/
+    assert_eq!(client_app.world.entities().len(), 1);
 }
 
 //-------------------------------------------------------------------------------------------------------------------

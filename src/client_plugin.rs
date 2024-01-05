@@ -6,6 +6,7 @@ use bevy::ecs::component::Tick;
 use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
 use bevy::utils::EntityHashSet;
+use bevy_kot_ecs::*;
 use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected, RenetReceive};
 use bevy_replicon::prelude::{
     BufferedUpdates, ClientSet, Replication, RepliconTick,
@@ -18,6 +19,8 @@ use bevy_replicon::prelude::{
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+/// Prespawned entities that were spawned between when a reconnect attempt started and when the reconnect succeeded.
+/// We don't despawn those entities in case they successfully landed on the server.
 #[derive(Resource, Default, Deref, DerefMut)]
 struct CachedPrespawns(EntityHashSet<Entity>);
 
@@ -32,12 +35,36 @@ impl Default for RepairChangeTickTracker { fn default() -> Self { Self(Tick::new
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn collect_prespawns(mut cached_prespawns: ResMut<CachedPrespawns>, prespawns: Query<Entity, Added<Prespawned>>)
-{
+/// We need to ignore prespawned entities spawned before the first reconnect.
+/// Since the `Added` filter only works for entities spawned since the last time a system ran, we need to run the
+/// system once when attempting to reconnect to initialize the query state to start fresh at that point in time.
+fn collect_prespawns_impl(
+    In(collect)          : In<bool>,
+    mut cached_prespawns : ResMut<CachedPrespawns>,
+    prespawns            : Query<Entity, Added<Prespawned>>
+){
+    if !collect { return; }
+
     for prespawn in prespawns.iter()
     {
         let _ = cached_prespawns.insert(prespawn);
     }
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn ignore_added_prespawns(world: &mut World)
+{
+    syscall(world, false, collect_prespawns_impl);
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn collect_prespawns(world: &mut World)
+{
+    syscall(world, false, collect_prespawns_impl);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -63,32 +90,36 @@ fn collect_world_change_tick(world: &mut World)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_just_disconnected(mut next: ResMut<NextState<ClientRepairState>>)
+fn detect_just_disconnected(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
+    if *current == ClientRepairState::Disconnected { return; }
     next.set(ClientRepairState::Disconnected);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_waiting(mut next: ResMut<NextState<ClientRepairState>>)
+fn detect_waiting(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
+    if *current == ClientRepairState::Waiting { return; }
     next.set(ClientRepairState::Waiting);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_first_replication(mut next: ResMut<NextState<ClientRepairState>>)
+fn detect_first_replication(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
+    if *current == ClientRepairState::Repairing { return; }
     next.set(ClientRepairState::Repairing);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn finish_repair(mut next: ResMut<NextState<ClientRepairState>>)
+fn finish_repair(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
+    if *current == ClientRepairState::Done { return; }
     next.set(ClientRepairState::Done);
 }
 
@@ -248,6 +279,9 @@ pub struct RepliconRepairPluginClient
     ///   session' even if the client mappings were sent to a dead renet client.
     ///   As a result, we won't despawn them if they fail to be replicated in the first server replication
     ///   message.
+    ///   For the best results, reinitialize your renet client between [`RenetReceive`](bevy_replicon::RenetReceive)
+    ///   and [`ClientSet::Receive`](bevy_replicon::prelude::ClientSet::Receive) (in `PreUpdate`), and spawn prespawned
+    ///   entities after [`ClientRepairSet`] (which runs in `PreUpdate`).
     /// - If you spawn entities in schedule `Last`, do so before the [`ClientRepairSet`] otherwise we
     ///   won't track them for cleanup.
     ///
@@ -290,7 +324,6 @@ impl Plugin for RepliconRepairPluginClient
                 (
                     // state: -> Disconnected
                     (
-                        clear_prespawn_cache.run_if(move || cleanup_prespawns),
                         clear_buffered_updates,
                         detect_just_disconnected,
                         apply_state_transition::<ClientRepairState>,
@@ -299,6 +332,12 @@ impl Plugin for RepliconRepairPluginClient
                         .run_if(client_just_disconnected()),
                     // state: Disconnected -> Waiting
                     (
+                        (
+                            clear_prespawn_cache,
+                            ignore_added_prespawns,
+                        )
+                            .chain()
+                            .run_if(move || cleanup_prespawns),
                         detect_waiting,
                         apply_state_transition::<ClientRepairState>,
                     )
