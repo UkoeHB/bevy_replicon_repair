@@ -1,10 +1,8 @@
-// copied from bevy_replicon
+// adapted from bevy_replicon
 
-use std::{
-    net::{Ipv4Addr, SocketAddr, UdpSocket},
-    time::SystemTime,
-};
+//local shortcuts
 
+//third-party shortcuts
 use bevy::prelude::*;
 use bevy_renet::renet::{
     transport::{
@@ -15,6 +13,68 @@ use bevy_renet::renet::{
 };
 use bevy_replicon::prelude::*;
 use serde::{Deserialize, Serialize};
+
+//standard shortcuts
+use std::{
+    net::{Ipv4Addr, SocketAddr, UdpSocket},
+    time::SystemTime,
+};
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+const PROTOCOL_ID: u64 = 0;
+
+fn create_server_transport() -> NetcodeServerTransport {
+    let current_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+    let server_addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);
+    let socket = UdpSocket::bind(server_addr).expect("localhost should be bindable");
+    let public_addr = socket
+        .local_addr()
+        .expect("socket should autodetect local address");
+    let server_config = ServerConfig {
+        current_time,
+        max_clients: 1,
+        protocol_id: PROTOCOL_ID,
+        public_addresses: vec![public_addr],
+        authentication: ServerAuthentication::Unsecure,
+    };
+
+    NetcodeServerTransport::new(server_config, socket).unwrap()
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn create_client_transport(client_id: u64, port: u16) -> NetcodeClientTransport {
+    let current_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+    let ip = Ipv4Addr::LOCALHOST.into();
+    let server_addr = SocketAddr::new(ip, port);
+    let socket = UdpSocket::bind((ip, 0)).expect("localhost should be bindable");
+    let authentication = ClientAuthentication::Unsecure {
+        client_id,
+        protocol_id: PROTOCOL_ID,
+        server_addr,
+        user_data: None,
+    };
+
+    NetcodeClientTransport::new(current_time, authentication, socket).unwrap()
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+#[derive(Component, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(super) struct DummyComponent;
+
+#[derive(Component, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(super) struct BasicComponent(pub(super) usize);
+
+//-------------------------------------------------------------------------------------------------------------------
 
 pub(super) fn connect(server_app: &mut App, client_app: &mut App) -> (u64, u16)
 {
@@ -61,6 +121,8 @@ pub(super) fn connect(server_app: &mut App, client_app: &mut App) -> (u64, u16)
     (client_id, server_port)
 }
 
+//-------------------------------------------------------------------------------------------------------------------
+
 pub(super) fn reconnect(server_app: &mut App, client_app: &mut App, client_id: u64, server_port: u16)
 {
     let network_channels = client_app.world.resource::<NetworkChannels>();
@@ -88,50 +150,4 @@ pub(super) fn reconnect(server_app: &mut App, client_app: &mut App, client_id: u
     }
 }
 
-const PROTOCOL_ID: u64 = 0;
-
-fn create_server_transport() -> NetcodeServerTransport {
-    let current_time = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
-    let server_addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);
-    let socket = UdpSocket::bind(server_addr).expect("localhost should be bindable");
-    let public_addr = socket
-        .local_addr()
-        .expect("socket should autodetect local address");
-    let server_config = ServerConfig {
-        current_time,
-        max_clients: 1,
-        protocol_id: PROTOCOL_ID,
-        public_addresses: vec![public_addr],
-        authentication: ServerAuthentication::Unsecure,
-    };
-
-    NetcodeServerTransport::new(server_config, socket).unwrap()
-}
-
-fn create_client_transport(client_id: u64, port: u16) -> NetcodeClientTransport {
-    let current_time = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
-    let ip = Ipv4Addr::LOCALHOST.into();
-    let server_addr = SocketAddr::new(ip, port);
-    let socket = UdpSocket::bind((ip, 0)).expect("localhost should be bindable");
-    let authentication = ClientAuthentication::Unsecure {
-        client_id,
-        protocol_id: PROTOCOL_ID,
-        server_addr,
-        user_data: None,
-    };
-
-    NetcodeClientTransport::new(current_time, authentication, socket).unwrap()
-}
-
-#[derive(Deserialize, Event, Serialize)]
-pub(super) struct DummyEvent(pub(super) Entity);
-
-impl MapNetworkEntities for DummyEvent {
-    fn map_entities<T: Mapper>(&mut self, mapper: &mut T) {
-        self.0 = mapper.map(self.0);
-    }
-}
+//-------------------------------------------------------------------------------------------------------------------

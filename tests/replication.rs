@@ -3,27 +3,17 @@ mod common;
 
 //local shortcuts
 use bevy_replicon_repair::*;
+use common::{BasicComponent, DummyComponent};
 
 //third-party shortcuts
 use bevy::prelude::*;
 use bevy_renet::renet::ClientId;
 use bevy_replicon::*;
 use bevy_replicon::prelude::*;
-use serde::{Deserialize, Serialize};
 
 //standard shortcuts
 
 
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-
-#[derive(Component, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
-struct DummyComponent;
-
-#[derive(Component, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
-struct BasicComponent(usize);
-
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 // normal replication works with new app extension

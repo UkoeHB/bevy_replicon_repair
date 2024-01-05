@@ -1,4 +1,5 @@
 //local shortcuts
+use crate::*;
 
 //third-party shortcuts
 use bevy::prelude::*;
@@ -93,7 +94,8 @@ impl Plugin for RepliconRepairPluginServer
     fn build(&self, app: &mut App)
     {
         app.init_resource::<CachedClientMap>()
-            .configure_sets(PostUpdate,
+            .init_resource::<ComponentRepairRules>()
+            .configure_sets(PreUpdate,
                 ServerRepairSet
                     .after(RenetReceive)
                     .run_if(resource_exists::<RepliconTick>())
