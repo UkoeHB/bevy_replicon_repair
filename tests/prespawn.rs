@@ -344,7 +344,65 @@ fn prespawn_fail_ignored_without_cleanup()
 #[test]
 fn prespawn_while_waiting_survives()
 {
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    */
 
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+    server_app.add_plugins(RepliconRepairPluginServer);
+    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    for app in [&mut server_app, &mut client_app] {
+        app.add_plugins((
+            MinimalPlugins,
+            ReplicationPlugins.set(ServerPlugin {
+                tick_policy: TickPolicy::EveryFrame,
+                ..Default::default()
+            }),
+        ))
+        .replicate_repair::<BasicComponent>()
+        .replicate_repair::<DummyComponent>();
+    }
+
+    // initial connection
+    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+    let client_id = ClientId::from_raw(client_id);
+
+    // disconnect
+    client_app.world.resource_mut::<RenetClient>().disconnect();
+    client_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(75));
+    server_app.update();
+    assert!(!server_app.world.resource::<RenetServer>().is_connected(client_id));
+
+    // reconnect
+    common::reconnect(&mut server_app, &mut client_app, client_id.raw(), server_port);
+    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Waiting);
+
+    server_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    client_app.update();
+
+    // spawning on client while waiting for init message
+    let client_entity = client_app.world.spawn(Prespawned).id();
+    // spawn a replicated entity on server to trigger an init message
+    let _server_entity = server_app.world.spawn((Replication, DummyComponent)).id();
+
+    server_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    client_app.update();
+    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+
+    let unreplicated_client_entity = client_app
+        .world
+        .query_filtered::<Entity, (With<Prespawned>, Without<Replication>, Without<DummyComponent>)>()
+        .single(&client_app.world);
+    assert_eq!(client_app.world.entities().len(), 2);
+    assert_eq!(unreplicated_client_entity, client_entity);
 }
 
 //-------------------------------------------------------------------------------------------------------------------

@@ -86,6 +86,10 @@ pub struct ServerRepairSet;
 ///   but then the client disconnects before it can receive the replicated server entity.
 ///   Since the client won't have the mapping, we need to link the server entity to the client entity after the client
 ///   reconnects so the client doesn't end up with a dangling prespawned entity.
+///
+/// Note that if `Replication` is removed from a mapped server entity and reinserted, then the mapping will not be
+/// sent in the next reconnect.
+/// This may be a source of bugs, so be careful.
 #[derive(Debug)]
 pub struct RepliconRepairPluginServer;
 

@@ -14,7 +14,7 @@ include = ["/src", "/tests", "/LICENSE*"]
 bevy          = { version = "0.12", default-features = false }
 bevy_kot_ecs  = { version = "0.10" }
 #bevy_replicon = { version = "0.18" }
-bevy_replicon = { git = "https://github.com/UkoeHB/bevy_replicon/", rev = "bf852e9" }
+bevy_replicon = { git = "https://github.com/lifescapegame/bevy_replicon/", rev = "c4b1e6f" }
 bincode       = { version = "1.3" }
 serde         = { version = "1.0" }
 tracing       = { version = "0.1" }

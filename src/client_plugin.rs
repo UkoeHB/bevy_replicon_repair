@@ -64,7 +64,7 @@ fn ignore_added_prespawns(world: &mut World)
 
 fn collect_prespawns(world: &mut World)
 {
-    syscall(world, false, collect_prespawns_impl);
+    syscall(world, true, collect_prespawns_impl);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -358,6 +358,7 @@ impl Plugin for RepliconRepairPluginClient
                         despawn_missing_entities,
                         apply_deferred,
                         (
+                            collect_prespawns,  //we need to collect prespawns from this tick
                             despawn_failed_prespawns,
                             clear_prespawn_cache,
                             apply_deferred,
@@ -377,7 +378,7 @@ impl Plugin for RepliconRepairPluginClient
             )
             .add_systems(Last,
                 (
-                    clean_dead_prespawns,
+                    clean_dead_prespawns,  //do this first in case of Prespawned being removed then re-added
                     collect_prespawns,
                 )
                     .chain()
