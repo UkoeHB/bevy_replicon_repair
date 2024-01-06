@@ -12,8 +12,8 @@ use std::marker::PhantomData;
 ///
 /// See [`repair_component`](crate::repair_component).
 #[derive(Component)]
-pub struct Ignored<T>(PhantomData<T>);
+pub struct Ignore<T>(PhantomData<T>);
 
-impl<T> Default for Ignored<T> { fn default() -> Self { Self(PhantomData::default()) } }
+impl<T> Default for Ignore<T> { fn default() -> Self { Self(PhantomData::default()) } }
 
 //-------------------------------------------------------------------------------------------------------------------
