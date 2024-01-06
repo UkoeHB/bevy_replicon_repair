@@ -301,3 +301,62 @@ fn disconnect_despawn_travels()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
+
+// client entity with ignored replicated component is not removed after a reconnect
+#[test]
+fn ignored_component_not_removed()
+{
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+    for app in [&mut server_app, &mut client_app] {
+        app.add_plugins((
+            MinimalPlugins,
+            ReplicationPlugins.set(ServerPlugin {
+                tick_policy: TickPolicy::EveryFrame,
+                ..Default::default()
+            }),
+            RepliconRepairPluginClient{
+                cleanup_prespawns: false,
+            },
+        ))
+        .replicate_repair::<BasicComponent>()
+        .replicate_repair::<DummyComponent>();
+    }
+
+    // initial connection
+    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+
+    server_app.world.spawn((Replication, BasicComponent::default()));
+
+    server_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    client_app.update();
+
+    let initial_client_entity = client_app
+        .world
+        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .single(&client_app.world);
+    assert_eq!(client_app.world.entities().len(), 1);
+
+    client_app.world.entity_mut(initial_client_entity).insert((DummyComponent, Ignore::<DummyComponent>::default()));
+
+    // disconnect
+    client_app.world.resource_mut::<RenetClient>().disconnect();
+    client_app.update();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.update();
+    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+
+    // reconnect
+    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+
+    let final_client_entity = client_app
+        .world
+        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>, With<DummyComponent>)>()
+        .single(&client_app.world);
+    assert_eq!(final_client_entity, initial_client_entity);
+    assert_eq!(client_app.world.entities().len(), 1);
+}
+
+//-------------------------------------------------------------------------------------------------------------------
