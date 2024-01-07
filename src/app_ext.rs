@@ -24,13 +24,13 @@ use serde::{de::DeserializeOwned, Serialize};
 /// If you manually added/changed the component on the entity in the repair tick, it may be erroneously left in place.
 /// Likewise, if you are not replicating the component and instead manually inserted it, it may be erroneously removed.
 ///
-/// You can disable this function for a client entity by adding an [`Ignore<C>`](crate::Ignore) component to it.
+/// You can disable this function for a client entity by adding an [`Retain<C>`](crate::Retain) component to it.
 pub fn repair_component<C: Component>(entity: &mut EntityWorldMut, preinit_tick: Tick)
 {
     let world_tick = unsafe { entity.world_mut().change_tick() };
 
-    // check if the component is ignored from replication
-    if entity.contains::<Ignore<C>>() { return; };
+    // check if the component should be retained
+    if entity.contains::<Retain<C>>() { return; };
 
     // check if the component exists on the entity
     let Some(change_ticks) = entity.get_change_ticks::<C>() else { return; };

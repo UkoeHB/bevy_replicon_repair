@@ -302,9 +302,9 @@ fn disconnect_despawn_travels()
 
 //-------------------------------------------------------------------------------------------------------------------
 
-// client entity with ignored replicated component is not removed after a reconnect
+// client entity with retained replicated component is not removed after a reconnect
 #[test]
-fn ignored_component_not_removed()
+fn retained_component_not_removed()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
@@ -338,7 +338,7 @@ fn ignored_component_not_removed()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 
-    client_app.world.entity_mut(initial_client_entity).insert((DummyComponent, Ignore::<DummyComponent>::default()));
+    client_app.world.entity_mut(initial_client_entity).insert((DummyComponent, Retain::<DummyComponent>::default()));
 
     // disconnect
     client_app.world.resource_mut::<RenetClient>().disconnect();

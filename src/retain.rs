@@ -8,12 +8,12 @@ use std::marker::PhantomData;
 
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Marker component that can be added to client entities to prevent component removal during reconnect repair.
+/// Marker component for client entities that prevents component removal during reconnect repair.
 ///
 /// See [`repair_component`](crate::repair_component).
 #[derive(Component)]
-pub struct Ignore<T>(PhantomData<T>);
+pub struct Retain<T>(PhantomData<T>);
 
-impl<T> Default for Ignore<T> { fn default() -> Self { Self(PhantomData::default()) } }
+impl<T> Default for Retain<T> { fn default() -> Self { Self(PhantomData::default()) } }
 
 //-------------------------------------------------------------------------------------------------------------------
