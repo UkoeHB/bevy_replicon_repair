@@ -2,7 +2,7 @@
 name = "bevy_replicon_repair"
 description = "Adds client state repair to bevy_replicon for reconnects."
 authors = ["koe <ukoe@protonmail.com>"]
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
 keywords = ["bevy", "networking", "bevy_replicon"]
 license = "MIT OR Apache-2.0"
@@ -21,8 +21,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 bevy          = { version = "0.12", default-features = false }
 bevy_kot_ecs  = { version = "0.10" }
-#bevy_replicon = { version = "0.18" }
-bevy_replicon = { git = "https://github.com/lifescapegame/bevy_replicon/", rev = "c4b1e6f" }
+bevy_replicon = { version = "0.19" }
 bincode       = { version = "1.3" }
 serde         = { version = "1.0" }
 tracing       = { version = "0.1" }
