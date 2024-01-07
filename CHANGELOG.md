@@ -7,7 +7,6 @@
 - Rename: `Ignore<C>` -> `Retain<C>`.
 
 
-
 ## [0.1.0]
 
 - Initial release.
