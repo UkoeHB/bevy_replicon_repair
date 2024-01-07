@@ -42,7 +42,7 @@ fn setup_replication(app: &mut App)
 
 Clients must include the [`RepliconRepairPluginClient`](bevy_replicon_repair::RepliconRepairPluginClient) plugin.
 
-The client plugin includes a `cleanup_prespawns` option, see the [documentation](bevy_replicon_repair::RepliconRepairPluginClient::cleanup_prespawns) for more details.
+The client plugin includes a [`cleanup_prespawns`](bevy_replicon_repair::RepliconRepairPluginClient::cleanup_prespawns) option for users of `bevy_replicon`'s client entity pre-mapping functionality. See the [documentation](bevy_replicon_repair::RepliconRepairPluginClient::cleanup_prespawns) for more details.
 
 ```rust
 fn setup_client(app: &mut App)

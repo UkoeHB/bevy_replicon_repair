@@ -264,9 +264,20 @@ pub struct ClientRepairSet;
 #[derive(Debug)]
 pub struct RepliconRepairPluginClient
 {
-    /// If true, client entities with the [`Prespawned`] component will be despawned if the server does not replicate
-    /// them in the first replication message after a reconnect. This is used for cleaning up client entities that are
-    /// pre-mapped on the server.
+    /// This is used for cleaning up client entities that are pre-mapped on the server.
+    /// You must add a [`Prespawned`] component to all pre-mapped client entities.
+    ///
+    /// Note that in general it is possible for a server to reject a client request to spawn an entity. This means
+    /// users typically need their own tracking and cleanup systems for failed prespawns. Users that want
+    /// to use their own cleanup systems instead of ours should set this to `false`.
+    ///
+    /// ### Details
+    ///
+    /// Client entities with the [`Prespawned`] component will be despawned if the server does not replicate
+    /// them in the first replication message after a reconnect.
+    /// We assume any client entity that meets that condition either failed to be spawned on the server (e.g. because the
+    /// client message with that entity failed to reach the server due to a disconnect), or was despawned on the server
+    /// while the client was disconnected.
     ///
     /// A client entity will be despawned only if it was spawned **before** the current client connection session started,
     /// even if it fails to replicate in the first server replication message.
@@ -284,10 +295,6 @@ pub struct RepliconRepairPluginClient
     ///   entities after [`ClientRepairSet`] (which runs in `PreUpdate`).
     /// - If you spawn entities in schedule `Last`, do so before the [`ClientRepairSet`] otherwise we
     ///   won't track them for cleanup.
-    ///
-    /// Note that in general it is possible for a server to reject a client request to spawn an entity. This means
-    /// users typically need their own tracking and cleanup systems for failed prespawns. Users that want
-    /// to use their own cleanup systems instead of ours should set this to `false`.
     pub cleanup_prespawns: bool,
 }
 
