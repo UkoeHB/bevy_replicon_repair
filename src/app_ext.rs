@@ -45,20 +45,20 @@ pub fn repair_component<C: Component>(entity: &mut EntityWorldMut, preinit_tick:
 
 pub trait AppReplicationRepairExt
 {
-    /// Mirrors [`AppReplicationExt::replicate`](bevy_replicon::prelude::AppReplicationExt) using the default
+    /// Mirrors [`AppReplicationExt::replicate`](bevy_replicon::prelude::AppReplicationExt::replicate) using the default
     /// component-removal repair function [`repair_component`].
     fn replicate_repair<C>(&mut self) -> &mut Self
     where
         C: Component + Serialize + DeserializeOwned;
 
-    /// Mirrors [`AppReplicationExt::replicate_mapped`](bevy_replicon::prelude::AppReplicationExt) using the default
-    /// component-removal repair function [`repair_component`].
+    /// Mirrors [`AppReplicationExt::replicate_mapped`](bevy_replicon::prelude::AppReplicationExt::replicate_mapped) using
+    /// the default component-removal repair function [`repair_component`].
     fn replicate_repair_mapped<C>(&mut self) -> &mut Self
     where
         C: Component + Serialize + DeserializeOwned + MapNetworkEntities;
 
-    /// Mirrors [`AppReplicationExt::replicate_with`](bevy_replicon::prelude::AppReplicationExt) with a user-defined
-    /// component-removal repair function.
+    /// Mirrors [`AppReplicationExt::replicate_with`](bevy_replicon::prelude::AppReplicationExt::replicate_with) with
+    /// a user-defined component-removal repair function.
     fn replicate_repair_with<C>(
         &mut self,
         serialize: SerializeFn,
@@ -105,6 +105,9 @@ impl AppReplicationRepairExt for App {
     where
         C: Component,
     {
+        if !self.world.contains_resource::<ComponentRepairRules>()
+        { self.world.init_resource::<ComponentRepairRules>(); }
+
         self.replicate_with::<C>(serialize, deserialize, remove);
         self.world.resource_mut::<ComponentRepairRules>().push(repair);
 

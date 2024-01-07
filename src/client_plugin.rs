@@ -306,8 +306,10 @@ impl Plugin for RepliconRepairPluginClient
             app.init_resource::<CachedPrespawns>();
         }
 
+        if !app.world.contains_resource::<ComponentRepairRules>()
+        { app.world.init_resource::<ComponentRepairRules>(); }
+
         app.add_state::<ClientRepairState>()
-            .init_resource::<ComponentRepairRules>()
             .init_resource::<RepairChangeTickTracker>()
             .configure_sets(PreUpdate,
                 ClientRepairSet

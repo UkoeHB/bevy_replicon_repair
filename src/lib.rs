@@ -1,3 +1,8 @@
+//documentation
+#![doc = include_str!("../README.md")]
+#![allow(unused_imports)]
+use crate as bevy_replicon_repair;
+
 //module tree
 mod app_ext;
 mod client_plugin;

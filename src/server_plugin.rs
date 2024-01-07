@@ -97,8 +97,10 @@ impl Plugin for RepliconRepairPluginServer
 {
     fn build(&self, app: &mut App)
     {
+        if !app.world.contains_resource::<ComponentRepairRules>()
+        { app.world.init_resource::<ComponentRepairRules>(); }
+
         app.init_resource::<CachedClientMap>()
-            .init_resource::<ComponentRepairRules>()
             .configure_sets(PreUpdate,
                 ServerRepairSet
                     .after(RenetReceive)
