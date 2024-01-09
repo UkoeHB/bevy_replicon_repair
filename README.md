@@ -40,28 +40,28 @@ fn setup_replication(app: &mut App)
 
 ### Client
 
-Clients must include the [`RepliconRepairPluginClient`](bevy_replicon_repair::RepliconRepairPluginClient) plugin.
+Clients must include the [`ClientPlugin`](bevy_replicon_repair::ClientPlugin).
 
-The client plugin includes a [`cleanup_prespawns`](bevy_replicon_repair::RepliconRepairPluginClient::cleanup_prespawns) option for users of `bevy_replicon`'s client entity pre-mapping functionality. See the [documentation](bevy_replicon_repair::RepliconRepairPluginClient::cleanup_prespawns) for more details.
+The client plugin includes a [`cleanup_prespawns`](bevy_replicon_repair::ClientPlugin::cleanup_prespawns) option for users of `bevy_replicon`'s client entity pre-mapping functionality. See the [documentation](bevy_replicon_repair::ClientPlugin::cleanup_prespawns) for more details.
 
 ```rust
 fn setup_client(app: &mut App)
 {
     setup_replication(app);  //replicate Health
-    app.insert_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    app.insert_plugins(ClientPlugin{ cleanup_prespawns: true });
 }
 ```
 
 
 ### Server
 
-Servers must include the [`RepliconRepairPluginServer`](bevy_replicon_repair::RepliconRepairPluginServer) plugin.
+Servers must include the [`ServerPlugin`](bevy_replicon_repair::ServerPlugin).
 
 ```rust
 fn setup_server(app: &mut App)
 {
     setup_replication(app);  //replicate Health
-    app.insert_plugins(RepliconRepairPluginServer);
+    app.insert_plugins(ServerPlugin);
 }
 ```
 
@@ -71,4 +71,4 @@ fn setup_server(app: &mut App)
 
 | `bevy_replicon` | `bevy_replicon_repair` |
 |-------|----------------|
-| 0.19  | 0.0.1 - master |
+| 0.19  | 0.1 - master |

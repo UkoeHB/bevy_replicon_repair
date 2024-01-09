@@ -25,11 +25,11 @@ fn normal_replication()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconRepairPluginClient{
+            bevy_replicon_repair::ClientPlugin{
                 cleanup_prespawns: false,
             },
         ))
@@ -62,11 +62,11 @@ fn entity_persists()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconRepairPluginClient{
+            bevy_replicon_repair::ClientPlugin{
                 cleanup_prespawns: false,
             },
         ))
@@ -118,11 +118,11 @@ fn disconnect_component_mutation_travels()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconRepairPluginClient{
+            bevy_replicon_repair::ClientPlugin{
                 cleanup_prespawns: false,
             },
         ))
@@ -182,11 +182,11 @@ fn disconnect_component_removal_travels()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconRepairPluginClient{
+            bevy_replicon_repair::ClientPlugin{
                 cleanup_prespawns: false,
             },
         ))
@@ -245,11 +245,11 @@ fn disconnect_despawn_travels()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconRepairPluginClient{
+            bevy_replicon_repair::ClientPlugin{
                 cleanup_prespawns: false,
             },
         ))
@@ -311,11 +311,11 @@ fn retained_component_not_removed()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            RepliconRepairPluginClient{
+            bevy_replicon_repair::ClientPlugin{
                 cleanup_prespawns: false,
             },
         ))

@@ -91,9 +91,9 @@ pub struct ServerRepairSet;
 /// sent in the next reconnect.
 /// This may be a source of bugs, so be careful.
 #[derive(Debug)]
-pub struct RepliconRepairPluginServer;
+pub struct ServerPlugin;
 
-impl Plugin for RepliconRepairPluginServer
+impl Plugin for ServerPlugin
 {
     fn build(&self, app: &mut App)
     {

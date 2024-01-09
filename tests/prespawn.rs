@@ -22,12 +22,12 @@ fn prespawn_normal()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -62,12 +62,12 @@ fn prespawn_replicated_and_survives()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -125,12 +125,12 @@ fn prespawn_not_replicated_and_survives()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -177,12 +177,12 @@ fn prespawn_at_disconnect_survives()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -237,12 +237,12 @@ fn prespawn_fail_dies_with_cleanup()
 
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -289,12 +289,12 @@ fn prespawn_fail_ignored_without_cleanup()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: false });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -354,12 +354,12 @@ fn prespawn_while_waiting_survives()
 
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(RepliconRepairPluginServer);
-    client_app.add_plugins(RepliconRepairPluginClient{ cleanup_prespawns: true });
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(ServerPlugin {
+            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),

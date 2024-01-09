@@ -235,7 +235,7 @@ pub enum ClientRepairState
 /// Marker component for entities prespawned on a client that are expected to be replicated by the server.
 ///
 /// This component should be added to all prespawned entities that you want to be auto-cleaned up by
-/// [`RepliconRepairPluginClient`] after a reconnect if the server fails to replicate them.
+/// [`ClientPlugin`] after a reconnect if the server fails to replicate them.
 #[derive(Component, Debug, Default, Copy, Clone)]
 pub struct Prespawned;
 
@@ -262,7 +262,7 @@ pub struct ClientRepairSet;
 ///   a component that can be replicated), then the component-removal systems may remove it from the entity erroneously.
 ///   See [`repair_component`] for how to selectively disable component removal.
 #[derive(Debug)]
-pub struct RepliconRepairPluginClient
+pub struct ClientPlugin
 {
     /// This is used for cleaning up client entities that are pre-mapped on the server.
     /// You must add a [`Prespawned`] component to all pre-mapped client entities.
@@ -298,7 +298,7 @@ pub struct RepliconRepairPluginClient
     pub cleanup_prespawns: bool,
 }
 
-impl Plugin for RepliconRepairPluginClient
+impl Plugin for ClientPlugin
 {
     fn build(&self, app: &mut App)
     {
