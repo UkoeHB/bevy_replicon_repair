@@ -2,7 +2,7 @@
 name = "bevy_replicon_repair"
 description = "Adds client state repair to bevy_replicon for reconnects."
 authors = ["koe <ukoe@protonmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 keywords = ["bevy", "networking", "bevy_replicon"]
 license = "MIT OR Apache-2.0"
