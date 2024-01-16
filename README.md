@@ -1,6 +1,8 @@
 # Bevy Replicon Repair
 
-This crate allows `bevy_replicon` client replication state to persist across a reconnect. Without this crate, you need to manually clean up all `bevy_replicon` replicated entities on a client when the client disconnects, since those entities will be replicated as new entities on reconnect.
+This crate extends [`bevy_replicon`](https://github.com/lifescapegame/bevy_replicon) with client reconnect handling so that client replication state will persist across a reconnect.
+
+Without this crate, you need to manually clean up all `bevy_replicon` replicated entities on a client when the client disconnects, since those entities will be replicated as new entities on reconnect.
 
 
 

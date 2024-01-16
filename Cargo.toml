@@ -1,6 +1,6 @@
 [package]
 name = "bevy_replicon_repair"
-description = "Adds client state repair to bevy_replicon for reconnects."
+description = "Extends bevy_replicon with client-state repair for reconnects."
 authors = ["koe <ukoe@protonmail.com>"]
 version = "0.3.0"
 edition = "2021"
