@@ -111,6 +111,7 @@ impl Plugin for ServerPlugin
                     // collect the current map before replicon cleans it in response to disconnects
                     collect_client_map.before(ServerSet::Receive),
                     // clean immediately before repairing the client map to avoid missing despawns
+                    // - We assume the server does not remove and re-add Replication to client-mapped server entities.
                     clean_client_map,
                     // return existing client mappings as soon as a client connection is detected
                     // - We do this after the replicon receive set in case a disconnect and connect event show up
