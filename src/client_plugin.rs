@@ -90,7 +90,7 @@ fn collect_world_change_tick(world: &mut World)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_just_disconnected(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_just_disconnected(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
     if *current == ClientRepairState::Disconnected { return; }
     next.set(ClientRepairState::Disconnected);
@@ -99,7 +99,7 @@ fn detect_just_disconnected(current: Res<State<ClientRepairState>>, mut next: Re
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_waiting(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_waiting(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
     if *current == ClientRepairState::Waiting { return; }
     next.set(ClientRepairState::Waiting);
@@ -108,7 +108,7 @@ fn detect_waiting(current: Res<State<ClientRepairState>>, mut next: ResMut<NextS
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn detect_first_replication(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_first_replication(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
     if *current == ClientRepairState::Repairing { return; }
     next.set(ClientRepairState::Repairing);
@@ -334,7 +334,7 @@ impl Plugin for ClientPlugin
                     // state: -> Disconnected
                     (
                         clear_buffered_updates,
-                        detect_just_disconnected,
+                        initiate_just_disconnected,
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
@@ -347,7 +347,7 @@ impl Plugin for ClientPlugin
                         )
                             .chain()
                             .run_if(move || cleanup_prespawns),
-                        detect_waiting,
+                        initiate_waiting,
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
@@ -355,7 +355,7 @@ impl Plugin for ClientPlugin
                         .run_if(in_state(ClientRepairState::Disconnected)),
                     // state: Waiting -> Repairing
                     (
-                        detect_first_replication,
+                        initiate_first_replication,
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()

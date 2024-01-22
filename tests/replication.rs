@@ -29,12 +29,10 @@ fn normal_replication()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            bevy_replicon_repair::ClientPlugin{
-                cleanup_prespawns: false,
-            },
         ))
         .replicate_repair::<BasicComponent>();
     }
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     common::connect(&mut server_app, &mut client_app);
 
@@ -66,12 +64,10 @@ fn entity_persists()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            bevy_replicon_repair::ClientPlugin{
-                cleanup_prespawns: false,
-            },
         ))
         .replicate_repair::<BasicComponent>();
     }
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -122,12 +118,10 @@ fn disconnect_component_mutation_travels()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            bevy_replicon_repair::ClientPlugin{
-                cleanup_prespawns: false,
-            },
         ))
         .replicate_repair::<BasicComponent>();
     }
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -186,12 +180,10 @@ fn disconnect_component_removal_travels()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            bevy_replicon_repair::ClientPlugin{
-                cleanup_prespawns: false,
-            },
         ))
         .replicate_repair::<BasicComponent>();
     }
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -249,13 +241,11 @@ fn disconnect_despawn_travels()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            bevy_replicon_repair::ClientPlugin{
-                cleanup_prespawns: false,
-            },
         ))
         .replicate_repair::<BasicComponent>()
         .replicate_repair::<DummyComponent>();
     }
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -315,13 +305,11 @@ fn retained_component_not_removed()
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
-            bevy_replicon_repair::ClientPlugin{
-                cleanup_prespawns: false,
-            },
         ))
         .replicate_repair::<BasicComponent>()
         .replicate_repair::<DummyComponent>();
     }
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
