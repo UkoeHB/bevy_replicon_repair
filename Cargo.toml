@@ -21,13 +21,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 bevy          = { version = "0.12", default-features = false }
 bevy_kot_ecs  = { version = "0.11" }
-bevy_replicon = { version = "0.20" }
+bevy_replicon = { version = "0.21" }
 bincode       = { version = "1.3" }
 serde         = { version = "1.0" }
 tracing       = { version = "0.1" }
-
-[patch.crates-io]
-bevy_replicon  = { git = "https://github.com/projectharmonia/bevy_replicon", rev = "9b50915" }
 
 [dev-dependencies]
 bevy_renet         = { version = "0.0.10", features = ["serde"] }
