@@ -9,7 +9,7 @@ use bevy::utils::EntityHashSet;
 use bevy_kot_ecs::*;
 use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected, RenetReceive};
 use bevy_replicon::prelude::{
-    BufferedUpdates, ClientSet, Replication, RepliconTick,
+    BufferedUpdates, ClientSet, ParentSync, ParentSyncPlugin, Replication, RepliconTick,
     ServerEntityMap, ServerEntityTicks,
 };
 
@@ -261,6 +261,10 @@ pub struct ClientRepairSet;
 ///   own system (e.g. they add `Transform` in reaction to a replicated blueprint, and also register `Transform` as
 ///   a component that can be replicated), then the component-removal systems may remove it from the entity erroneously.
 ///   See [`repair_component`] for how to selectively disable component removal.
+///
+/// The `bevy_replicon` type `ParentSync` is automatically registered for repair if `ParentSyncPlugin` is present.
+///
+/// This plugin must be added after `bevy_replicon`'s `ClientPlugin`.
 #[derive(Debug)]
 pub struct ClientPlugin
 {
@@ -302,8 +306,15 @@ impl Plugin for ClientPlugin
 {
     fn build(&self, app: &mut App)
     {
+        if !app.is_plugin_added::<bevy_replicon::prelude::ClientPlugin>()
+        { panic!("repair's ClientPlugin depends on replicon's ClientPlugin"); }
+
         // disable replicon's cleanup
         app.configure_sets(PreUpdate, ClientSet::Reset.run_if(|| false));
+
+        // pre-register replicon's ParentSync
+        if app.is_plugin_added::<ParentSyncPlugin>()
+        { app.add_replication_repair::<ParentSync>(repair_component::<ParentSync>); }
 
         // set up repair cleanup
         let cleanup_prespawns = self.cleanup_prespawns;

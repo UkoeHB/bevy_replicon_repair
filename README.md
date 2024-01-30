@@ -37,6 +37,10 @@ fn setup_replication(app: &mut App)
 }
 ```
 
+Note that if you have a component that was already registered with `bevy_replicon`'s API, you can add replication repair with [`add_replication_repair`](bevy_replicon_repair::AppReplicationRepairExt::add_replication_repair).
+
+The `bevy_replicon` component `ParentSync` is registered for repair by default if `ParentSyncPlugin` is present.
+
 
 ### Client
 

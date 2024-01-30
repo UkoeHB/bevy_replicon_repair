@@ -90,6 +90,8 @@ pub struct ServerRepairSet;
 /// Note that if `Replication` is removed from a mapped server entity and reinserted, then the mapping will not be
 /// sent in the next reconnect.
 /// This may be a source of bugs, so be careful.
+///
+/// This plugin must be added after `bevy_replicon`'s `ClientPlugin`.
 #[derive(Debug)]
 pub struct ServerPlugin;
 
@@ -97,6 +99,9 @@ impl Plugin for ServerPlugin
 {
     fn build(&self, app: &mut App)
     {
+        if !app.is_plugin_added::<bevy_replicon::prelude::ServerPlugin>()
+        { panic!("repair's ServerPlugin depends on replicon's ServerPlugin"); }
+
         if !app.world.contains_resource::<ComponentRepairRules>()
         { app.world.init_resource::<ComponentRepairRules>(); }
 

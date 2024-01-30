@@ -68,6 +68,16 @@ pub trait AppReplicationRepairExt
     ) -> &mut Self
     where
         C: Component;
+
+    /// Registers a user-defined component-removal repair function.
+    ///
+    /// This can be used for components that were already registered for replication via `bevy_replicon`'s API.
+    fn add_replication_repair<C>(
+        &mut self,
+        repair: RepairComponentFn,
+    ) -> &mut Self
+    where
+        C: Component;
 }
 
 impl AppReplicationRepairExt for App {
@@ -105,10 +115,22 @@ impl AppReplicationRepairExt for App {
     where
         C: Component,
     {
+        self.replicate_with::<C>(serialize, deserialize, remove);
+        self.add_replication_repair::<C>(repair);
+
+        self
+    }
+
+    fn add_replication_repair<C>(
+        &mut self,
+        repair: RepairComponentFn,
+    ) -> &mut Self
+    where
+        C: Component,
+    {
         if !self.world.contains_resource::<ComponentRepairRules>()
         { self.world.init_resource::<ComponentRepairRules>(); }
 
-        self.replicate_with::<C>(serialize, deserialize, remove);
         self.world.resource_mut::<ComponentRepairRules>().push(repair);
 
         self

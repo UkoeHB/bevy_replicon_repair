@@ -22,8 +22,6 @@ fn prespawn_normal()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -34,6 +32,8 @@ fn prespawn_normal()
         ))
         .replicate_repair::<BasicComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     let (client_id, _server_port) = common::connect(&mut server_app, &mut client_app);
     let client_id = ClientId::from_raw(client_id);
@@ -62,8 +62,6 @@ fn prespawn_replicated_and_survives()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -74,6 +72,8 @@ fn prespawn_replicated_and_survives()
         ))
         .replicate_repair::<BasicComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -125,8 +125,6 @@ fn prespawn_not_replicated_and_survives()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -137,6 +135,8 @@ fn prespawn_not_replicated_and_survives()
         ))
         .replicate_repair::<BasicComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -177,8 +177,6 @@ fn prespawn_at_disconnect_survives()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -189,6 +187,8 @@ fn prespawn_at_disconnect_survives()
         ))
         .replicate_repair::<BasicComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -237,8 +237,6 @@ fn prespawn_fail_dies_with_cleanup()
 
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -250,6 +248,8 @@ fn prespawn_fail_dies_with_cleanup()
         .replicate_repair::<BasicComponent>()
         .replicate_repair::<DummyComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -289,8 +289,6 @@ fn prespawn_fail_ignored_without_cleanup()
 {
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -302,6 +300,8 @@ fn prespawn_fail_ignored_without_cleanup()
         .replicate_repair::<BasicComponent>()
         .replicate_repair::<DummyComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
@@ -354,8 +354,6 @@ fn prespawn_while_waiting_survives()
 
     let mut server_app = App::new();
     let mut client_app = App::new();
-    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
-    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
@@ -367,6 +365,8 @@ fn prespawn_while_waiting_survives()
         .replicate_repair::<BasicComponent>()
         .replicate_repair::<DummyComponent>();
     }
+    server_app.add_plugins(bevy_replicon_repair::ServerPlugin);
+    client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
     let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);

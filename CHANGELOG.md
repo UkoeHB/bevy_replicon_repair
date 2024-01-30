@@ -1,5 +1,20 @@
 # Changelog
 
+## [WIP]
+
+### Changed
+
+- The server and client plugins now panic if not added after the corresponding replicon plugins.
+
+### Fixed
+
+- `bevy_replicon`'s `ParentSync` component is now automatically registered for repair if `ParentSyncPlugin` is present.
+
+### Added
+
+- Added `add_replication_repair` method to the app extension, for use when a component has already been registered for replication and you just need to add repair to it.
+
+
 ## [0.4.0]
 
 ### Changed
