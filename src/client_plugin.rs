@@ -3,10 +3,9 @@ use crate::*;
 
 //third-party shortcuts
 use bevy::ecs::component::Tick;
-use bevy::ecs::system::Despawn;
+use bevy::ecs::entity::EntityHashSet;
 use bevy::prelude::*;
-use bevy::utils::EntityHashSet;
-use bevy_kot_ecs::*;
+use bevy_cobweb::prelude::*;
 use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected, RenetReceive};
 use bevy_replicon::prelude::{
     BufferedUpdates, ClientSet, ParentSync, ParentSyncPlugin, Replication, RepliconTick,
@@ -22,7 +21,7 @@ use bevy_replicon::prelude::{
 /// Prespawned entities that were spawned between when a reconnect attempt started and when the reconnect succeeded.
 /// We don't despawn those entities in case they successfully landed on the server.
 #[derive(Resource, Default, Deref, DerefMut)]
-struct CachedPrespawns(EntityHashSet<Entity>);
+struct CachedPrespawns(EntityHashSet);
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -138,8 +137,9 @@ fn despawn_missing_entities(
             |entity, tick|
             {
                 if *tick == replicon_tick { return true; }
-                commands.add(Despawn{ entity: *entity });
-                entity_map.remove_by_client(*entity);
+                let entity = *entity;
+                commands.add(move |world: &mut World| { world.despawn(entity); });
+                entity_map.remove_by_client(entity);
                 false
             }
         );
@@ -176,7 +176,7 @@ fn despawn_failed_prespawns(
     {
         if cached.contains(&entity) { continue; }
         if tick_map.contains_key(&entity) { continue; }
-        commands.add(Despawn{ entity });
+        commands.add(move |world: &mut World| { world.despawn(entity); });
     }
 }
 
@@ -327,12 +327,12 @@ impl Plugin for ClientPlugin
         if !app.world.contains_resource::<ComponentRepairRules>()
         { app.world.init_resource::<ComponentRepairRules>(); }
 
-        app.add_state::<ClientRepairState>()
+        app.init_state::<ClientRepairState>()
             .init_resource::<RepairChangeTickTracker>()
             .configure_sets(PreUpdate,
                 ClientRepairSet
                     .after(ClientSet::Receive)
-                    .run_if(resource_exists::<RepliconTick>())
+                    .run_if(resource_exists::<RepliconTick>)
             )
             .add_systems(PreUpdate,
                 collect_world_change_tick
@@ -349,7 +349,7 @@ impl Plugin for ClientPlugin
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
-                        .run_if(client_just_disconnected()),
+                        .run_if(client_just_disconnected),
                     // state: Disconnected -> Waiting
                     (
                         (
@@ -362,7 +362,7 @@ impl Plugin for ClientPlugin
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
-                        .run_if(client_just_connected().or_else(client_connecting()))
+                        .run_if(client_just_connected.or_else(client_connecting))
                         .run_if(in_state(ClientRepairState::Disconnected)),
                     // state: Waiting -> Repairing
                     (
@@ -371,7 +371,7 @@ impl Plugin for ClientPlugin
                     )
                         .chain()
                         .run_if(in_state(ClientRepairState::Waiting))
-                        .run_if(resource_changed::<RepliconTick>()),
+                        .run_if(resource_changed::<RepliconTick>),
                     // repair
                     // state: Repairing -> Done
                     (

@@ -75,5 +75,6 @@ fn setup_server(app: &mut App)
 
 | `bevy_replicon` | `bevy_replicon_repair` |
 |-------|----------------|
-| 0.21  | 0.4       |
-| 0.19  | 0.1 - 0.3 |
+| 0.23  | 0.5 - master   |
+| 0.21  | 0.4            |
+| 0.19  | 0.1 - 0.3      |

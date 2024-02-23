@@ -3,8 +3,9 @@ use crate::*;
 
 //third-party shortcuts
 use bevy::ecs::component::Tick;
+use bevy::ecs::entity::MapEntities;
 use bevy::prelude::*;
-use bevy_replicon::prelude::{AppReplicationExt, MapNetworkEntities};
+use bevy_replicon::prelude::AppReplicationExt;
 use bevy_replicon::replicon_core::replication_rules::{
     SerializeFn, DeserializeFn, RemoveComponentFn, serialize_component, deserialize_component, remove_component,
     deserialize_mapped_component,
@@ -55,7 +56,7 @@ pub trait AppReplicationRepairExt
     /// the default component-removal repair function [`repair_component`].
     fn replicate_repair_mapped<C>(&mut self) -> &mut Self
     where
-        C: Component + Serialize + DeserializeOwned + MapNetworkEntities;
+        C: Component + Serialize + DeserializeOwned + MapEntities;
 
     /// Mirrors [`AppReplicationExt::replicate_with`](bevy_replicon::prelude::AppReplicationExt::replicate_with) with
     /// a user-defined component-removal repair function.
@@ -95,7 +96,7 @@ impl AppReplicationRepairExt for App {
 
     fn replicate_repair_mapped<C>(&mut self) -> &mut Self
     where
-        C: Component + Serialize + DeserializeOwned + MapNetworkEntities,
+        C: Component + Serialize + DeserializeOwned + MapEntities,
     {
         self.replicate_repair_with::<C>(
                 serialize_component::<C>,

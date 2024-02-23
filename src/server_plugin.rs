@@ -3,7 +3,7 @@ use crate::*;
 
 //third-party shortcuts
 use bevy::prelude::*;
-use bevy::utils::EntityHashMap;
+use bevy::ecs::entity::EntityHashMap;
 use bevy_replicon::RenetReceive;
 use bevy_replicon::renet::{ClientId, ServerEvent};
 use bevy_replicon::prelude::{ClientEntityMap, ClientMapping, Replication, RepliconTick, ServerSet};
@@ -16,7 +16,7 @@ use bevy_replicon::prelude::{ClientEntityMap, ClientMapping, Replication, Replic
 
 /// [ server entity : (client id : client entity) ]
 #[derive(Resource, Default, Deref, DerefMut)]
-struct CachedClientMap(EntityHashMap<Entity, (ClientId, Entity)>);
+struct CachedClientMap(EntityHashMap<(ClientId, Entity)>);
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ impl Plugin for ServerPlugin
             .configure_sets(PreUpdate,
                 ServerRepairSet
                     .after(RenetReceive)
-                    .run_if(resource_exists::<RepliconTick>())
+                    .run_if(resource_exists::<RepliconTick>)
             )
             .add_systems(PreUpdate,
                 (
