@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0]
+
+### Changed
+
+- Update to `bevy_cobweb` v0.6.
+
+
 ## [0.6.0]
 
 ### Changed

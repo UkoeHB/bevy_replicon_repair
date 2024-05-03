@@ -20,7 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 bevy          = { version = "0.13", default-features = false }
-bevy_cobweb   = { version = "0.0.4" }
+bevy_cobweb   = { version = "0.6" }
 bevy_replicon = { version = "0.23" }
 bincode       = { version = "1.3" }
 serde         = { version = "1.0" }
