@@ -6,11 +6,10 @@ use bevy::ecs::component::Tick;
 use bevy::ecs::entity::EntityHashSet;
 use bevy::prelude::*;
 use bevy_cobweb::prelude::*;
-use bevy_replicon::{client_just_disconnected, client_connecting, client_just_connected, RenetReceive};
-use bevy_replicon::prelude::{
-    BufferedUpdates, ClientSet, ParentSync, ParentSyncPlugin, Replication, RepliconTick,
-    ServerEntityMap, ServerEntityTicks,
-};
+use bevy_replicon::client::confirmed::Confirmed;
+use bevy_replicon::client::server_entity_map::ServerEntityMap;
+use bevy_replicon::client::{BufferedUpdates, ServerInitTick};
+use bevy_replicon::prelude::*;
 
 //standard shortcuts
 
@@ -34,14 +33,14 @@ impl Default for RepairChangeTickTracker { fn default() -> Self { Self(Tick::new
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-/// We need to ignore prespawned entities spawned before the first reconnect.
-/// Since the `Added` filter only works for entities spawned since the last time a system ran, we need to run the
-/// system once when attempting to reconnect to initialize the query state to start fresh at that point in time.
+/// Collects entities prespawned after starting to reconnect, in order to despawn entities spawned before that point.
 fn collect_prespawns_impl(
     In(collect)          : In<bool>,
     mut cached_prespawns : ResMut<CachedPrespawns>,
     prespawns            : Query<Entity, Added<Prespawned>>
 ){
+    // Since the `Added` filter only works for components added since the last time a system ran, we need to run the
+    // system once when attempting to reconnect to initialize the query state to start fresh at that point in time.
     if !collect { return; }
 
     for prespawn in prespawns.iter()
@@ -107,7 +106,7 @@ fn initiate_waiting(current: Res<State<ClientRepairState>>, mut next: ResMut<Nex
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn initiate_first_replication(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_repairing(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
 {
     if *current == ClientRepairState::Repairing { return; }
     next.set(ClientRepairState::Repairing);
@@ -125,24 +124,19 @@ fn finish_repair(current: Res<State<ClientRepairState>>, mut next: ResMut<NextSt
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Iterate client entity map after first init message, despawn entities with old replicon tick + remove from map.
+/// Iterate replicated entities after first init message, despawn entities with old replicon tick + remove from map.
 fn despawn_missing_entities(
     mut commands   : Commands,
-    mut tick_map   : ResMut<ServerEntityTicks>,
+    replicated     : Query<(Entity, &Confirmed), With<Replicated>>,
     mut entity_map : ResMut<ServerEntityMap>,
-    replicon_tick  : Res<RepliconTick>,
+    replicon_tick  : Res<ServerInitTick>,
 ){
-    let replicon_tick = *replicon_tick;
-    tick_map.retain(
-            |entity, tick|
-            {
-                if *tick == replicon_tick { return true; }
-                let entity = *entity;
-                commands.add(move |world: &mut World| { world.despawn(entity); });
-                entity_map.remove_by_client(entity);
-                false
-            }
-        );
+    for (entity, confirmed) in replicated.iter()
+    {
+        if confirmed.last_tick() == **replicon_tick { continue; }
+        commands.add(move |world: &mut World| { world.despawn(entity); });
+        entity_map.remove_by_client(entity);
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -164,18 +158,17 @@ fn clear_buffered_updates(mut buffered: ResMut<BufferedUpdates>)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Iterate prespawned entities, despawn if not in client entity map and not prespawned since this connection session
+/// Iterate prespawned entities, despawn if not replicated and not prespawned since this connection session
 /// started.
 fn despawn_failed_prespawns(
     mut commands : Commands,
     cached       : Res<CachedPrespawns>,
-    tick_map     : Res<ServerEntityTicks>,
-    prespawned   : Query<Entity, With<Prespawned>>,
+    prespawned   : Query<(Entity, Has<Replicated>), With<Prespawned>>,
 ){
-    for entity in prespawned.iter()
+    for (entity, is_replicated) in prespawned.iter()
     {
+        if is_replicated { continue; }
         if cached.contains(&entity) { continue; }
-        if tick_map.contains_key(&entity) { continue; }
         commands.add(move |world: &mut World| { world.despawn(entity); });
     }
 }
@@ -186,7 +179,7 @@ fn despawn_failed_prespawns(
 //todo: this could be more efficient...
 fn cleanup_entity_components(
     mut commands : Commands,
-    replicated   : Query<Entity, With<Replication>>,
+    replicated   : Query<Entity, With<Replicated>>,
     preinit_tick : Res<RepairChangeTickTracker>,
 ){
     let preinit_tick = **preinit_tick;
@@ -241,6 +234,9 @@ pub struct Prespawned;
 
 //-------------------------------------------------------------------------------------------------------------------
 
+/// System set in [`PreUpdate`] that contains all repair systems.
+///
+/// Runs after [`ClientSet::Receive`].
 #[derive(SystemSet, Debug, Default, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct ClientRepairSet;
 
@@ -262,9 +258,9 @@ pub struct ClientRepairSet;
 ///   a component that can be replicated), then the component-removal systems may remove it from the entity erroneously.
 ///   See [`repair_component`] for how to selectively disable component removal.
 ///
-/// The `bevy_replicon` type `ParentSync` is automatically registered for repair if `ParentSyncPlugin` is present.
+/// The `bevy_replicon` type [`ParentSync`] is automatically registered for repair if [`ParentSyncPlugin`] is present.
 ///
-/// This plugin must be added after `bevy_replicon`'s `ClientPlugin`.
+/// This plugin must be added after `bevy_replicon`'s [`ClientPlugin`](bevy_replicon::prelude::ClientPlugin).
 #[derive(Debug)]
 pub struct ClientPlugin
 {
@@ -294,9 +290,9 @@ pub struct ClientPlugin
     ///   session' even if the client mappings were sent to a dead renet client.
     ///   As a result, we won't despawn them if they fail to be replicated in the first server replication
     ///   message.
-    ///   For the best results, reinitialize your renet client between [`RenetReceive`](bevy_replicon::RenetReceive)
-    ///   and [`ClientSet::Receive`](bevy_replicon::prelude::ClientSet::Receive) (in `PreUpdate`), and spawn prespawned
-    ///   entities after [`ClientRepairSet`] (which runs in `PreUpdate`).
+    ///   For the best results, reinitialize your renet client between [`ClientSet::ReceivePackets`]
+    ///   and [`ClientSet::Receive`] (in `PreUpdate`), and spawn prespawned
+    ///   entities after [`ClientRepairSet`] (which also runs in `PreUpdate`).
     /// - If you spawn entities in schedule `Last`, do so before the [`ClientRepairSet`] otherwise we
     ///   won't track them for cleanup.
     pub cleanup_prespawns: bool,
@@ -314,7 +310,7 @@ impl Plugin for ClientPlugin
 
         // pre-register replicon's ParentSync
         if app.is_plugin_added::<ParentSyncPlugin>()
-        { app.add_replication_repair::<ParentSync>(repair_component::<ParentSync>); }
+        { app.add_replication_repair_fn(repair_component::<ParentSync>); }
 
         // set up repair cleanup
         let cleanup_prespawns = self.cleanup_prespawns;
@@ -332,11 +328,11 @@ impl Plugin for ClientPlugin
             .configure_sets(PreUpdate,
                 ClientRepairSet
                     .after(ClientSet::Receive)
-                    .run_if(resource_exists::<RepliconTick>)
+                    .run_if(resource_exists::<ServerInitTick>)
             )
             .add_systems(PreUpdate,
                 collect_world_change_tick
-                    .after(RenetReceive)
+                    .after(ClientSet::ReceivePackets)
                     .before(ClientSet::Receive)
                     .run_if(not(in_state(ClientRepairState::Dormant)))
             )
@@ -366,12 +362,12 @@ impl Plugin for ClientPlugin
                         .run_if(in_state(ClientRepairState::Disconnected)),
                     // state: Waiting -> Repairing
                     (
-                        initiate_first_replication,
+                        initiate_repairing,
                         apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
                         .run_if(in_state(ClientRepairState::Waiting))
-                        .run_if(resource_changed::<RepliconTick>),
+                        .run_if(resource_changed::<ServerInitTick>),
                     // repair
                     // state: Repairing -> Done
                     (

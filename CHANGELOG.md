@@ -5,6 +5,7 @@
 ### Changed
 
 - Update to `bevy_cobweb` v0.6.
+- Update to `bevy_replicon` v0.25.
 
 
 ## [0.6.0]

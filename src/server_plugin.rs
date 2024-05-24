@@ -4,9 +4,8 @@ use crate::*;
 //third-party shortcuts
 use bevy::prelude::*;
 use bevy::ecs::entity::EntityHashMap;
-use bevy_replicon::RenetReceive;
-use bevy_replicon::renet::{ClientId, ServerEvent};
-use bevy_replicon::prelude::{ClientEntityMap, ClientMapping, Replication, RepliconTick, ServerSet};
+use bevy_replicon::prelude::*;
+use bevy_replicon::server::server_tick::ServerTick;
 
 //standard shortcuts
 
@@ -28,8 +27,9 @@ fn collect_client_map(mut cached: ResMut<CachedClientMap>, mapped: Res<ClientEnt
         for mapping in mappings.iter()
         {
             // only one server <-> client entity mapping is currently supported per server entity
+            // - Note: This warning will print if `ClientEntityMap` entries are inserted before `ServerSet::Receive`.
             if cached.insert(mapping.server_entity, (*client_id, mapping.client_entity)).is_some()
-            { tracing::error!(?client_id, ?mapping, "overwriting cached client mapping"); }
+            { tracing::warn!(?client_id, ?mapping, "overwriting cached client mapping"); }
         }
     }
 }
@@ -62,7 +62,7 @@ fn return_client_map(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn clean_client_map(mut cached: ResMut<CachedClientMap>, mut despawns: RemovedComponents<Replication>)
+fn clean_client_map(mut cached: ResMut<CachedClientMap>, mut despawns: RemovedComponents<Replicated>)
 {
     for server_entity in despawns.read()
     {
@@ -77,6 +77,7 @@ fn clean_client_map(mut cached: ResMut<CachedClientMap>, mut despawns: RemovedCo
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+/// System set in [`PostUpdate`] for server repair. Runs before [`ServerSet::Send`].
 #[derive(SystemSet, Debug, Default, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct ServerRepairSet;
 
@@ -87,7 +88,7 @@ pub struct ServerRepairSet;
 ///   Since the client won't have the mapping, we need to link the server entity to the client entity after the client
 ///   reconnects so the client doesn't end up with a dangling prespawned entity.
 ///
-/// Note that if `Replication` is removed from a mapped server entity and reinserted, then the mapping will not be
+/// Note that if [`Replicated`] is removed from a mapped server entity and reinserted, then the mapping will not be
 /// sent in the next reconnect.
 /// This may be a source of bugs, so be careful.
 ///
@@ -106,22 +107,28 @@ impl Plugin for ServerPlugin
         { app.world.init_resource::<ComponentRepairRules>(); }
 
         app.init_resource::<CachedClientMap>()
-            .configure_sets(PreUpdate,
+            .configure_sets(PostUpdate,
                 ServerRepairSet
-                    .after(RenetReceive)
-                    .run_if(resource_exists::<RepliconTick>)
+                    .before(ServerSet::Send)
+                    .run_if(resource_exists::<ServerTick>)
             )
             .add_systems(PreUpdate,
                 (
-                    // collect the current map before replicon cleans it in response to disconnects
-                    collect_client_map.before(ServerSet::Receive),
+                    // collect the current map before it gets cleaned up due to a disconnect
+                    collect_client_map,
+                )
+                    .after(ServerSet::ReceivePackets)
+                    .before(ServerSet::Receive)
+            )
+            .add_systems(PostUpdate,
+                (
+                    // collect the current map
+                    collect_client_map,
                     // clean immediately before repairing the client map to avoid missing despawns
-                    // - We assume the server does not remove and re-add Replication to client-mapped server entities.
+                    // - We assume the server does not remove and re-add Replicated to client-mapped server entities.
                     clean_client_map,
                     // return existing client mappings as soon as a client connection is detected
-                    // - We do this after the replicon receive set in case a disconnect and connect event show up
-                    //   in the same tick (this would be a bug, but we want to be defensive here).
-                    return_client_map.after(ServerSet::Receive),
+                    return_client_map,
                 )
                     .chain()
                     .in_set(ServerRepairSet)

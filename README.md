@@ -10,7 +10,7 @@ Without this crate, you need to manually clean up all `bevy_replicon` replicated
 
 This crate is not an all-in-one solution to reconnect handling. Client and server events (direct messages) can fail if sent at or after a disconnect. This means after a disconnect, any client with state tied to server events (or tied to the expectation that client-sent events arrived on the server) may have stale state. Typically you want the server to send 'initialization' messages to a client that has just connected, to transmit anything the client won't receive from replication.
 
-In terms of client architecture, you generally want to trap the client in a loading screen while waiting for all initialization (or reinitialization) state to arrive, so the user can't interact with an incomplete world. You can use change detection on [`RepliconTick`](bevy_replicon::prelude::RepliconTick) to detect when the server's first replication message arrives, and you can manually track the arrival of expected initialization messages.
+In terms of client architecture, you generally want to trap the client in a loading screen while waiting for all initialization (or reinitialization) state to arrive, so the user can't interact with an incomplete world. You can use change detection on [`ServerInitTick`](bevy_replicon::client::ServerInitTick) to detect when the server's first replication message arrives, and you can manually track the arrival of expected initialization messages.
 
 Note that renet does not support automatic reconnects. To reconnect a client you need to acquire a completely new connect token from the server/backend then recreate the renet client and transport resources.
 
@@ -20,7 +20,7 @@ Note that renet does not support automatic reconnects. To reconnect a client you
 
 ### Registering components for replication
 
-We wrapped `bevy_replicon`'s component-registration API [`AppReplicationExt`](bevy_replicon::prelude::AppReplicationExt) in our own app extension [`AppReplicationRepairExt`](bevy_replicon_repair::AppReplicationRepairExt).
+We wrapped `bevy_replicon`'s component-registration API [`AppRuleExt`](bevy_replicon::prelude::AppRuleExt) in our own app extension [`AppReplicationRepairExt`](bevy_replicon_repair::AppReplicationRepairExt).
 
 The wrapped API lets you define a custom 'component-removal function' which will be called on client entities after the first server replication message following a reconnect. That function should remove any replication-registered components that failed to replicate after reconnecting. We provide a default function [`repair_component`](bevy_replicon_repair::repair_component) that behaves how you would expect.
 
@@ -37,7 +37,7 @@ fn setup_replication(app: &mut App)
 }
 ```
 
-Note that if you have a component that was already registered with `bevy_replicon`'s API, you can add replication repair with [`add_replication_repair`](bevy_replicon_repair::AppReplicationRepairExt::add_replication_repair).
+Note that if you have a component that was already registered with `bevy_replicon`'s API, you can add replication repair with [`add_replication_repair_fn`](bevy_replicon_repair::AppReplicationRepairExt::add_replication_repair_fn).
 
 The `bevy_replicon` component `ParentSync` is registered for repair by default if `ParentSyncPlugin` is present.
 
@@ -75,6 +75,7 @@ fn setup_server(app: &mut App)
 
 | `bevy_replicon` | `bevy_replicon_repair` |
 |-------|----------------|
-| 0.23  | 0.5 - master   |
+| 0.25  | 0.7 - master   |
+| 0.23  | 0.5            |
 | 0.21  | 0.4            |
 | 0.19  | 0.1 - 0.3      |

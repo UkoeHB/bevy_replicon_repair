@@ -5,11 +5,7 @@ use crate::*;
 use bevy::ecs::component::Tick;
 use bevy::ecs::entity::MapEntities;
 use bevy::prelude::*;
-use bevy_replicon::prelude::AppReplicationExt;
-use bevy_replicon::replicon_core::replication_rules::{
-    SerializeFn, DeserializeFn, RemoveComponentFn, serialize_component, deserialize_component, remove_component,
-    deserialize_mapped_component,
-};
+use bevy_replicon::core::{replication_fns::rule_fns::RuleFns, replication_rules::{AppRuleExt, GroupReplication}};
 use serde::{de::DeserializeOwned, Serialize};
 
 //standard shortcuts
@@ -46,39 +42,44 @@ pub fn repair_component<C: Component>(entity: &mut EntityWorldMut, preinit_tick:
 
 pub trait AppReplicationRepairExt
 {
-    /// Mirrors [`AppReplicationExt::replicate`](bevy_replicon::prelude::AppReplicationExt::replicate) using the default
+    /// Mirrors [`AppRuleExt::replicate`](bevy_replicon::prelude::AppRuleExt::replicate) using the default
     /// component-removal repair function [`repair_component`].
     fn replicate_repair<C>(&mut self) -> &mut Self
     where
         C: Component + Serialize + DeserializeOwned;
 
-    /// Mirrors [`AppReplicationExt::replicate_mapped`](bevy_replicon::prelude::AppReplicationExt::replicate_mapped) using
+    /// Mirrors [`AppRuleExt::replicate_mapped`](bevy_replicon::prelude::AppRuleExt::replicate_mapped) using
     /// the default component-removal repair function [`repair_component`].
     fn replicate_repair_mapped<C>(&mut self) -> &mut Self
     where
         C: Component + Serialize + DeserializeOwned + MapEntities;
 
-    /// Mirrors [`AppReplicationExt::replicate_with`](bevy_replicon::prelude::AppReplicationExt::replicate_with) with
+    /// Mirrors [`AppRuleExt::replicate_with`](bevy_replicon::prelude::AppRuleExt::replicate_with) with
     /// a user-defined component-removal repair function.
     fn replicate_repair_with<C>(
         &mut self,
-        serialize: SerializeFn,
-        deserialize: DeserializeFn,
-        remove: RemoveComponentFn,
+        rules: RuleFns<C>,
         repair: RepairComponentFn,
     ) -> &mut Self
     where
         C: Component;
 
-    /// Registers a user-defined component-removal repair function.
-    ///
-    /// This can be used for components that were already registered for replication via `bevy_replicon`'s API.
-    fn add_replication_repair<C>(
+    /// Mirrors [`AppRuleExt::replicate_group`](bevy_replicon::prelude::AppRuleExt::replicate_group) with
+    /// a user-defined component-removal repair function.
+    fn replicate_repair_group<C>(
         &mut self,
         repair: RepairComponentFn,
     ) -> &mut Self
     where
-        C: Component;
+        C: GroupReplication;
+
+    /// Registers a user-defined component-removal repair function.
+    ///
+    /// This can be used for components that were already registered for replication via `bevy_replicon`'s API.
+    fn add_replication_repair_fn(
+        &mut self,
+        repair: RepairComponentFn,
+    ) -> &mut Self;
 }
 
 impl AppReplicationRepairExt for App {
@@ -87,9 +88,7 @@ impl AppReplicationRepairExt for App {
         C: Component + Serialize + DeserializeOwned,
     {
         self.replicate_repair_with::<C>(
-                serialize_component::<C>,
-                deserialize_component::<C>,
-                remove_component::<C>,
+                RuleFns::default(),
                 repair_component::<C>,
             )
     }
@@ -99,35 +98,42 @@ impl AppReplicationRepairExt for App {
         C: Component + Serialize + DeserializeOwned + MapEntities,
     {
         self.replicate_repair_with::<C>(
-                serialize_component::<C>,
-                deserialize_mapped_component::<C>,
-                remove_component::<C>,
+                RuleFns::default_mapped(),
                 repair_component::<C>,
             )
     }
 
     fn replicate_repair_with<C>(
         &mut self,
-        serialize: SerializeFn,
-        deserialize: DeserializeFn,
-        remove: RemoveComponentFn,
+        rules: RuleFns<C>,
         repair: RepairComponentFn,
     ) -> &mut Self
     where
         C: Component,
     {
-        self.replicate_with::<C>(serialize, deserialize, remove);
-        self.add_replication_repair::<C>(repair);
+        self.replicate_with::<C>(rules);
+        self.add_replication_repair_fn(repair);
 
         self
     }
 
-    fn add_replication_repair<C>(
+    fn replicate_repair_group<C>(
         &mut self,
         repair: RepairComponentFn,
     ) -> &mut Self
     where
-        C: Component,
+        C: GroupReplication
+    {
+        self.replicate_group::<C>();
+        self.add_replication_repair_fn(repair);
+
+        self
+    }
+
+    fn add_replication_repair_fn(
+        &mut self,
+        repair: RepairComponentFn,
+    ) -> &mut Self
     {
         if !self.world.contains_resource::<ComponentRepairRules>()
         { self.world.init_resource::<ComponentRepairRules>(); }

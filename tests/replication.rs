@@ -7,9 +7,8 @@ use common::{BasicComponent, DummyComponent};
 
 //third-party shortcuts
 use bevy::prelude::*;
-use bevy_renet::renet::ClientId;
-use bevy_replicon::*;
 use bevy_replicon::prelude::*;
+use bevy_replicon::test_app::ServerTestAppExt;
 
 //standard shortcuts
 
@@ -25,7 +24,7 @@ fn normal_replication()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
+            RepliconPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -36,15 +35,15 @@ fn normal_replication()
 
     common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, BasicComponent::default()));
+    server_app.world.spawn((Replicated, BasicComponent::default()));
 
     server_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let _client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 }
@@ -60,7 +59,7 @@ fn entity_persists()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
+            RepliconPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -70,34 +69,33 @@ fn entity_persists()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+    let _client_id = common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, BasicComponent::default()));
+    server_app.world.spawn((Replicated, BasicComponent::default()));
 
     server_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let initial_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 
     // disconnect
-    client_app.world.resource_mut::<RenetClient>().disconnect();
-    client_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.update();
-    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+    common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    common::reconnect(&mut server_app, &mut client_app);
+    server_app.update();
+    server_app.exchange_with_client(&mut client_app);
+    client_app.update();
     assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
 
     let new_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(new_client_entity, initial_client_entity);
     assert_eq!(client_app.world.entities().len(), 1);
@@ -114,7 +112,7 @@ fn disconnect_component_mutation_travels()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
+            RepliconPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -124,41 +122,40 @@ fn disconnect_component_mutation_travels()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+    let _client_id = common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, BasicComponent::default()));
+    server_app.world.spawn((Replicated, BasicComponent::default()));
 
     server_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let initial_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 
     // disconnect
-    client_app.world.resource_mut::<RenetClient>().disconnect();
-    client_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.update();
-    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+    common::disconnect(&mut server_app, &mut client_app);
 
     // mutate component
     let mut component = server_app
         .world
-        .query_filtered::<&mut BasicComponent, With<Replication>>()
+        .query_filtered::<&mut BasicComponent, With<Replicated>>()
         .single_mut(&mut server_app.world);
     *component = BasicComponent(1);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    common::reconnect(&mut server_app, &mut client_app);
+    server_app.update();
+    server_app.exchange_with_client(&mut client_app);
+    client_app.update();
     assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
 
     let (new_client_entity, component) = client_app
         .world
-        .query_filtered::<(Entity, &BasicComponent), With<Replication>>()
+        .query_filtered::<(Entity, &BasicComponent), With<Replicated>>()
         .single(&client_app.world);
     assert_eq!(new_client_entity, initial_client_entity);
     assert_eq!(*component, BasicComponent(1));
@@ -176,7 +173,7 @@ fn disconnect_component_removal_travels()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
+            RepliconPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -186,41 +183,40 @@ fn disconnect_component_removal_travels()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+    let _client_id = common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, BasicComponent::default()));
+    server_app.world.spawn((Replicated, BasicComponent::default()));
 
     server_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let initial_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 
     // disconnect
-    client_app.world.resource_mut::<RenetClient>().disconnect();
-    client_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.update();
-    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+    common::disconnect(&mut server_app, &mut client_app);
 
     // remove component
     let server_entity = server_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&server_app.world);
     server_app.world.entity_mut(server_entity).remove::<BasicComponent>();
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    common::reconnect(&mut server_app, &mut client_app);
+    server_app.update();
+    server_app.exchange_with_client(&mut client_app);
+    client_app.update();
     assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
 
     let new_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, Without<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, Without<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(new_client_entity, initial_client_entity);
     assert_eq!(client_app.world.entities().len(), 1);
@@ -237,7 +233,7 @@ fn disconnect_despawn_travels()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
+            RepliconPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -248,43 +244,42 @@ fn disconnect_despawn_travels()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+    let _client_id = common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, BasicComponent::default()));
+    server_app.world.spawn((Replicated, BasicComponent::default()));
     //this is needed because replicon won't replicate zero entities, so no init message will be sent on reconnect
-    server_app.world.spawn((Replication, DummyComponent));
+    server_app.world.spawn((Replicated, DummyComponent));
 
     server_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let initial_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 2);
 
     // disconnect
-    client_app.world.resource_mut::<RenetClient>().disconnect();
-    client_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.update();
-    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+    common::disconnect(&mut server_app, &mut client_app);
 
     // despawn entity
     let server_entity = server_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&server_app.world);
     server_app.world.despawn(server_entity);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    common::reconnect(&mut server_app, &mut client_app);
+    server_app.update();
+    server_app.exchange_with_client(&mut client_app);
+    client_app.update();
     assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
 
     let dummy_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<DummyComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<DummyComponent>)>()
         .single(&client_app.world);
     assert_ne!(dummy_client_entity, initial_client_entity);
     assert_eq!(client_app.world.entities().len(), 1);
@@ -301,7 +296,7 @@ fn retained_component_not_removed()
     for app in [&mut server_app, &mut client_app] {
         app.add_plugins((
             MinimalPlugins,
-            ReplicationPlugins.set(bevy_replicon::prelude::ServerPlugin {
+            RepliconPlugins.set(bevy_replicon::prelude::ServerPlugin {
                 tick_policy: TickPolicy::EveryFrame,
                 ..Default::default()
             }),
@@ -312,36 +307,35 @@ fn retained_component_not_removed()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let (client_id, server_port) = common::connect(&mut server_app, &mut client_app);
+    let _client_id = common::connect(&mut server_app, &mut client_app);
 
-    server_app.world.spawn((Replication, BasicComponent::default()));
+    server_app.world.spawn((Replicated, BasicComponent::default()));
 
     server_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let initial_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
         .single(&client_app.world);
     assert_eq!(client_app.world.entities().len(), 1);
 
     client_app.world.entity_mut(initial_client_entity).insert((DummyComponent, Retain::<DummyComponent>::default()));
 
     // disconnect
-    client_app.world.resource_mut::<RenetClient>().disconnect();
-    client_app.update();
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.update();
-    assert!(!server_app.world.resource::<RenetServer>().is_connected(ClientId::from_raw(client_id)));
+    common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app, client_id, server_port);
+    common::reconnect(&mut server_app, &mut client_app);
+    server_app.update();
+    server_app.exchange_with_client(&mut client_app);
+    client_app.update();
     assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
 
     let final_client_entity = client_app
         .world
-        .query_filtered::<Entity, (With<Replication>, With<BasicComponent>, With<DummyComponent>)>()
+        .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>, With<DummyComponent>)>()
         .single(&client_app.world);
     assert_eq!(final_client_entity, initial_client_entity);
     assert_eq!(client_app.world.entities().len(), 1);
