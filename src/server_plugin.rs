@@ -115,6 +115,7 @@ impl Plugin for ServerPlugin
             .add_systems(PreUpdate,
                 (
                     // collect the current map before it gets cleaned up due to a disconnect
+                    // - This is mainly needed for unit tests where mappings are inserted manually.
                     collect_client_map,
                 )
                     .after(ServerSet::ReceivePackets)

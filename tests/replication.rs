@@ -69,7 +69,7 @@ fn entity_persists()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     server_app.world.spawn((Replicated, BasicComponent::default()));
 
@@ -87,7 +87,7 @@ fn entity_persists()
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -122,7 +122,7 @@ fn disconnect_component_mutation_travels()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     server_app.world.spawn((Replicated, BasicComponent::default()));
 
@@ -147,7 +147,7 @@ fn disconnect_component_mutation_travels()
     *component = BasicComponent(1);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -183,7 +183,7 @@ fn disconnect_component_removal_travels()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     server_app.world.spawn((Replicated, BasicComponent::default()));
 
@@ -208,7 +208,7 @@ fn disconnect_component_removal_travels()
     server_app.world.entity_mut(server_entity).remove::<BasicComponent>();
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -244,7 +244,7 @@ fn disconnect_despawn_travels()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     server_app.world.spawn((Replicated, BasicComponent::default()));
     //this is needed because replicon won't replicate zero entities, so no init message will be sent on reconnect
@@ -271,7 +271,7 @@ fn disconnect_despawn_travels()
     server_app.world.despawn(server_entity);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -307,7 +307,7 @@ fn retained_component_not_removed()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     server_app.world.spawn((Replicated, BasicComponent::default()));
 
@@ -327,7 +327,7 @@ fn retained_component_not_removed()
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();

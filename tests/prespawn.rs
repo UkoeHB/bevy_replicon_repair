@@ -95,7 +95,7 @@ fn prespawn_replicated_and_survives()
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -153,7 +153,7 @@ fn prespawn_not_replicated_and_survives()
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -205,7 +205,7 @@ fn prespawn_at_disconnect_survives()
     server_app.world.resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -254,7 +254,7 @@ fn prespawn_fail_dies_with_cleanup()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     let client_entity = client_app.world.spawn(Prespawned).id();
     let _server_entity = server_app.world.spawn((Replicated, DummyComponent)).id();
@@ -263,7 +263,7 @@ fn prespawn_fail_dies_with_cleanup()
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -304,7 +304,7 @@ fn prespawn_fail_ignored_without_cleanup()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: false });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     let client_entity = client_app.world.spawn(Prespawned).id();
     let _server_entity = server_app.world.spawn((Replicated, DummyComponent)).id();
@@ -313,7 +313,7 @@ fn prespawn_fail_ignored_without_cleanup()
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
@@ -367,13 +367,13 @@ fn prespawn_while_waiting_survives()
     client_app.add_plugins(bevy_replicon_repair::ClientPlugin{ cleanup_prespawns: true });
 
     // initial connection
-    let _client_id = common::connect(&mut server_app, &mut client_app);
+    let client_id = common::connect(&mut server_app, &mut client_app);
 
     // disconnect
     common::disconnect(&mut server_app, &mut client_app);
 
     // reconnect
-    common::reconnect(&mut server_app, &mut client_app);
+    common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
