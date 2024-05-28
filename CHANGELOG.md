@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1]
+
+### Fixed
+
+- `ServerRepairSet` now runs after `ServerSet::StoreHierarchy` and also runs in `PreUpdate` as it did before.
+
+
 ## [0.8.0]
 
 ### Changed

@@ -107,8 +107,15 @@ impl Plugin for ServerPlugin
         { app.world.init_resource::<ComponentRepairRules>(); }
 
         app.init_resource::<CachedClientMap>()
+            .configure_sets(PreUpdate,
+                ServerRepairSet
+                    .after(ServerSet::ReceivePackets)
+                    .before(ServerSet::Receive)
+                    .run_if(resource_exists::<ServerTick>)
+            )
             .configure_sets(PostUpdate,
                 ServerRepairSet
+                    .after(ServerSet::StoreHierarchy)
                     .before(ServerSet::Send)
                     .run_if(resource_exists::<ServerTick>)
             )
@@ -118,8 +125,7 @@ impl Plugin for ServerPlugin
                     // - This is mainly needed for unit tests where mappings are inserted manually.
                     collect_client_map,
                 )
-                    .after(ServerSet::ReceivePackets)
-                    .before(ServerSet::Receive)
+                    .in_set(ServerRepairSet)
             )
             .add_systems(PostUpdate,
                 (
