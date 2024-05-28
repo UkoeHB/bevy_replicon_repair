@@ -6,7 +6,7 @@ use bevy::ecs::component::Tick;
 use bevy::ecs::entity::EntityHashSet;
 use bevy::prelude::*;
 use bevy_cobweb::prelude::*;
-use bevy_replicon::client::confirmed::Confirmed;
+use bevy_replicon::client::confirm_history::ConfirmHistory;
 use bevy_replicon::client::server_entity_map::ServerEntityMap;
 use bevy_replicon::client::{BufferedUpdates, ServerInitTick};
 use bevy_replicon::prelude::*;
@@ -127,13 +127,13 @@ fn finish_repair(current: Res<State<ClientRepairState>>, mut next: ResMut<NextSt
 /// Iterate replicated entities after first init message, despawn entities with old replicon tick + remove from map.
 fn despawn_missing_entities(
     mut commands   : Commands,
-    replicated     : Query<(Entity, &Confirmed), With<Replicated>>,
+    replicated     : Query<(Entity, &ConfirmHistory), With<Replicated>>,
     mut entity_map : ResMut<ServerEntityMap>,
     replicon_tick  : Res<ServerInitTick>,
 ){
-    for (entity, confirmed) in replicated.iter()
+    for (entity, history) in replicated.iter()
     {
-        if confirmed.last_tick() == **replicon_tick { continue; }
+        if history.last_tick() == **replicon_tick { continue; }
         commands.add(move |world: &mut World| { world.despawn(entity); });
         entity_map.remove_by_client(entity);
     }
