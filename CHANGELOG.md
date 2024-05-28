@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2]
+
+### Fixed
+
+- Clients now use `despawn_recursive` when cleaning up entities.
+
+
 ## [0.8.1]
 
 ### Fixed

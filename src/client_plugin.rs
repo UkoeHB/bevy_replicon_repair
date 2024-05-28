@@ -134,7 +134,7 @@ fn despawn_missing_entities(
     for (entity, history) in replicated.iter()
     {
         if history.last_tick() == **replicon_tick { continue; }
-        commands.add(move |world: &mut World| { world.despawn(entity); });
+        commands.get_entity(entity).map(DespawnRecursiveExt::despawn_recursive);
         entity_map.remove_by_client(entity);
     }
 }
@@ -169,7 +169,7 @@ fn despawn_failed_prespawns(
     {
         if is_replicated { continue; }
         if cached.contains(&entity) { continue; }
-        commands.add(move |world: &mut World| { world.despawn(entity); });
+        commands.get_entity(entity).map(DespawnRecursiveExt::despawn_recursive);
     }
 }
 
