@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3]
+
+### Fixed
+
+- Run `ClientRepairSet` between `ClientSet::Receive` and `ClientSet::SyncHierarchy`.
+
+
 ## [0.8.2]
 
 ### Fixed

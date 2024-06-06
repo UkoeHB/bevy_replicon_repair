@@ -328,6 +328,7 @@ impl Plugin for ClientPlugin
             .configure_sets(PreUpdate,
                 ClientRepairSet
                     .after(ClientSet::Receive)
+                    .before(ClientSet::SyncHierarchy)
                     .run_if(resource_exists::<ServerInitTick>)
             )
             .add_systems(PreUpdate,
