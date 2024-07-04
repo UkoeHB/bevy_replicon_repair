@@ -7,8 +7,8 @@ use bevy::ecs::entity::EntityHashSet;
 use bevy::prelude::*;
 use bevy_cobweb::prelude::*;
 use bevy_replicon::client::confirm_history::ConfirmHistory;
-use bevy_replicon::client::server_entity_map::ServerEntityMap;
 use bevy_replicon::client::{BufferedUpdates, ServerInitTick};
+use bevy_replicon::core::server_entity_map::ServerEntityMap;
 use bevy_replicon::prelude::*;
 
 //standard shortcuts
@@ -88,37 +88,37 @@ fn collect_world_change_tick(world: &mut World)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn initiate_just_disconnected(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_just_disconnected(mut state: ResMut<ClientRepairState>)
 {
-    if *current == ClientRepairState::Disconnected { return; }
-    next.set(ClientRepairState::Disconnected);
+    if state.in_state(ClientRepairState::Disconnected) { return; }
+    state.set(ClientRepairState::Disconnected);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn initiate_waiting(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_waiting(mut state: ResMut<ClientRepairState>)
 {
-    if *current == ClientRepairState::Waiting { return; }
-    next.set(ClientRepairState::Waiting);
+    if state.in_state(ClientRepairState::Waiting) { return; }
+    state.set(ClientRepairState::Waiting);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn initiate_repairing(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn initiate_repairing(mut state: ResMut<ClientRepairState>)
 {
-    if *current == ClientRepairState::Repairing { return; }
-    next.set(ClientRepairState::Repairing);
+    if state.in_state(ClientRepairState::Repairing) { return; }
+    state.set(ClientRepairState::Repairing);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn finish_repair(current: Res<State<ClientRepairState>>, mut next: ResMut<NextState<ClientRepairState>>)
+fn finish_repair(mut state: ResMut<ClientRepairState>)
 {
-    if *current == ClientRepairState::Done { return; }
-    next.set(ClientRepairState::Done);
+    if state.in_state(ClientRepairState::Done) { return; }
+    state.set(ClientRepairState::Done);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn cleanup_entity_components(
 ///
 /// The state will only leave `Dormant` after the first client disconnect. This ensures repair will not
 /// run needlessly for the first connection session.
-#[derive(States, Default, Debug, Hash, Eq, PartialEq, Copy, Clone)]
+#[derive(Resource, Default, Debug, Hash, Eq, PartialEq, Copy, Clone)]
 pub enum ClientRepairState
 {
     /// The client is in its initial connection session.
@@ -221,6 +221,27 @@ pub enum ClientRepairState
     Repairing,
     /// The first replication message has been handled.
     Done,
+}
+
+impl ClientRepairState
+{
+    /// Sets the current state.
+    pub fn set(&mut self, state: Self)
+    {
+        *self = state;
+    }
+
+    /// Returns `true` if `other` equals `self`.
+    pub fn in_state(&self, other: Self) -> bool
+    {
+        *self == other
+    }
+
+    /// Returns `true` if `other` does not equal `self`.
+    pub fn not_in_state(&self, other: Self) -> bool
+    {
+        !self.in_state(other)
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -320,10 +341,10 @@ impl Plugin for ClientPlugin
             app.init_resource::<CachedPrespawns>();
         }
 
-        if !app.world.contains_resource::<ComponentRepairRules>()
-        { app.world.init_resource::<ComponentRepairRules>(); }
+        if !app.world().contains_resource::<ComponentRepairRules>()
+        { app.world_mut().init_resource::<ComponentRepairRules>(); }
 
-        app.init_state::<ClientRepairState>()
+        app.init_resource::<ClientRepairState>()
             .init_resource::<RepairChangeTickTracker>()
             .configure_sets(PreUpdate,
                 ClientRepairSet
@@ -335,7 +356,7 @@ impl Plugin for ClientPlugin
                 collect_world_change_tick
                     .after(ClientSet::ReceivePackets)
                     .before(ClientSet::Receive)
-                    .run_if(not(in_state(ClientRepairState::Dormant)))
+                    .run_if(|s: Res<ClientRepairState>| s.not_in_state(ClientRepairState::Dormant))
             )
             .add_systems(PreUpdate,
                 (
@@ -343,7 +364,6 @@ impl Plugin for ClientPlugin
                     (
                         clear_buffered_updates,
                         initiate_just_disconnected,
-                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
                         .run_if(client_just_disconnected),
@@ -356,39 +376,33 @@ impl Plugin for ClientPlugin
                             .chain()
                             .run_if(move || cleanup_prespawns),
                         initiate_waiting,
-                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
                         .run_if(client_just_connected.or_else(client_connecting))
-                        .run_if(in_state(ClientRepairState::Disconnected)),
+                        .run_if(|s: Res<ClientRepairState>| s.in_state(ClientRepairState::Disconnected)),
                     // state: Waiting -> Repairing
                     (
                         initiate_repairing,
-                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
-                        .run_if(in_state(ClientRepairState::Waiting))
+                        .run_if(|s: Res<ClientRepairState>| s.in_state(ClientRepairState::Waiting))
                         .run_if(resource_changed::<ServerInitTick>),
                     // repair
                     // state: Repairing -> Done
                     (
                         despawn_missing_entities,
-                        apply_deferred,
                         (
                             collect_prespawns,  //we need to collect prespawns from this tick
                             despawn_failed_prespawns,
                             clear_prespawn_cache,
-                            apply_deferred,
                         )
                             .chain()
                             .run_if(move || cleanup_prespawns),
                         cleanup_entity_components,
-                        apply_deferred,
                         finish_repair,
-                        apply_state_transition::<ClientRepairState>,
                     )
                         .chain()
-                        .run_if(in_state(ClientRepairState::Repairing))
+                        .run_if(|s: Res<ClientRepairState>| s.in_state(ClientRepairState::Repairing)),
                 )
                     .chain()
                     .in_set(ClientRepairSet)
@@ -400,7 +414,7 @@ impl Plugin for ClientPlugin
                 )
                     .chain()
                     .run_if(move || cleanup_prespawns)
-                    .run_if(in_state(ClientRepairState::Waiting))
+                    .run_if(|s: Res<ClientRepairState>| s.in_state(ClientRepairState::Waiting))
                     .in_set(ClientRepairSet)
             );
     }

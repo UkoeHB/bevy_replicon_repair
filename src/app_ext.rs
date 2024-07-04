@@ -135,10 +135,10 @@ impl AppReplicationRepairExt for App {
         repair: RepairComponentFn,
     ) -> &mut Self
     {
-        if !self.world.contains_resource::<ComponentRepairRules>()
-        { self.world.init_resource::<ComponentRepairRules>(); }
+        if !self.world().contains_resource::<ComponentRepairRules>()
+        { self.world_mut().init_resource::<ComponentRepairRules>(); }
 
-        self.world.resource_mut::<ComponentRepairRules>().push(repair);
+        self.world_mut().resource_mut::<ComponentRepairRules>().push(repair);
 
         self
     }

@@ -103,8 +103,8 @@ impl Plugin for ServerPlugin
         if !app.is_plugin_added::<bevy_replicon::prelude::ServerPlugin>()
         { panic!("repair's ServerPlugin depends on replicon's ServerPlugin"); }
 
-        if !app.world.contains_resource::<ComponentRepairRules>()
-        { app.world.init_resource::<ComponentRepairRules>(); }
+        if !app.world().contains_resource::<ComponentRepairRules>()
+        { app.world_mut().init_resource::<ComponentRepairRules>(); }
 
         app.init_resource::<CachedClientMap>()
             .configure_sets(PreUpdate,

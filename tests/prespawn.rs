@@ -36,19 +36,19 @@ fn prespawn_normal()
 
     let client_id = common::connect(&mut server_app, &mut client_app);
 
-    let client_entity = client_app.world.spawn(Prespawned).id();
-    let server_entity = server_app.world.spawn((Replicated, BasicComponent::default())).id();
-    server_app.world.resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
+    let server_entity = server_app.world_mut().spawn((Replicated, BasicComponent::default())).id();
+    server_app.world_mut().resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (With<Prespawned>, With<Replicated>, With<BasicComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 1);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 1);
     assert_eq!(replicated_client_entity, client_entity);
 }
 
@@ -76,19 +76,19 @@ fn prespawn_replicated_and_survives()
     // initial connection
     let client_id = common::connect(&mut server_app, &mut client_app);
 
-    let client_entity = client_app.world.spawn(Prespawned).id();
-    let server_entity = server_app.world.spawn((Replicated, BasicComponent::default())).id();
-    server_app.world.resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
+    let server_entity = server_app.world_mut().spawn((Replicated, BasicComponent::default())).id();
+    server_app.world_mut().resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (With<Prespawned>, With<Replicated>, With<BasicComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 1);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 1);
     assert_eq!(replicated_client_entity, client_entity);
 
     // disconnect
@@ -99,17 +99,17 @@ fn prespawn_replicated_and_survives()
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Done);
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (With<Prespawned>, With<Replicated>, With<BasicComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 1);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 1);
     assert_eq!(replicated_client_entity, client_entity);
 }
 
@@ -145,9 +145,9 @@ fn prespawn_not_replicated_and_survives()
     // initial connection
     let client_id = common::connect(&mut server_app, &mut client_app);
 
-    let client_entity = client_app.world.spawn(Prespawned).id();
-    let server_entity = server_app.world.spawn((Replicated, BasicComponent::default())).id();
-    server_app.world.resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
+    let server_entity = server_app.world_mut().spawn((Replicated, BasicComponent::default())).id();
+    server_app.world_mut().resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
 
     // disconnect
     common::disconnect(&mut server_app, &mut client_app);
@@ -157,19 +157,19 @@ fn prespawn_not_replicated_and_survives()
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Done);
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
-    assert_eq!(client_app.world.entities().len(), 1);
+    assert_eq!(client_app.world().entities().len(), 1);
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         //.query_filtered::<Entity, (With<Prespawned>, With<Replicated>, With<BasicComponent>)>()
         .query_filtered::<Entity, (With<Replicated>, With<BasicComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 1);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 1);
     assert_eq!(replicated_client_entity, client_entity);
 }
 
@@ -200,26 +200,26 @@ fn prespawn_at_disconnect_survives()
     // disconnect
     common::disconnect(&mut server_app, &mut client_app);
 
-    let client_entity = client_app.world.spawn(Prespawned).id();
-    let server_entity = server_app.world.spawn((Replicated, BasicComponent::default())).id();
-    server_app.world.resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
+    let server_entity = server_app.world_mut().spawn((Replicated, BasicComponent::default())).id();
+    server_app.world_mut().resource_mut::<ClientEntityMap>().insert(client_id, ClientMapping{ server_entity, client_entity });
 
     // reconnect
     common::reconnect(&mut server_app, &mut client_app, client_id);
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Done);
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (With<Prespawned>, With<Replicated>, With<BasicComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 1);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 1);
     assert_eq!(replicated_client_entity, client_entity);
 }
 
@@ -256,8 +256,8 @@ fn prespawn_fail_dies_with_cleanup()
     // initial connection
     let client_id = common::connect(&mut server_app, &mut client_app);
 
-    let client_entity = client_app.world.spawn(Prespawned).id();
-    let _server_entity = server_app.world.spawn((Replicated, DummyComponent)).id();
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
+    let _server_entity = server_app.world_mut().spawn((Replicated, DummyComponent)).id();
 
     // disconnect
     common::disconnect(&mut server_app, &mut client_app);
@@ -267,17 +267,17 @@ fn prespawn_fail_dies_with_cleanup()
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Done);
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (Without<Prespawned>, With<Replicated>, With<DummyComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 1);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 1);
     assert_ne!(replicated_client_entity, client_entity);
 }
 
@@ -306,8 +306,8 @@ fn prespawn_fail_ignored_without_cleanup()
     // initial connection
     let client_id = common::connect(&mut server_app, &mut client_app);
 
-    let client_entity = client_app.world.spawn(Prespawned).id();
-    let _server_entity = server_app.world.spawn((Replicated, DummyComponent)).id();
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
+    let _server_entity = server_app.world_mut().spawn((Replicated, DummyComponent)).id();
 
     // disconnect
     common::disconnect(&mut server_app, &mut client_app);
@@ -317,21 +317,21 @@ fn prespawn_fail_ignored_without_cleanup()
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Done);
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     let unreplicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (With<Prespawned>, Without<Replicated>, Without<BasicComponent>)>()
-        .single(&client_app.world);
+        .single(&client_app.world());
     let replicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (Without<Prespawned>, With<Replicated>, With<DummyComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 2);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 2);
     assert_eq!(unreplicated_client_entity, client_entity);
     assert_ne!(replicated_client_entity, client_entity);
 }
@@ -377,27 +377,27 @@ fn prespawn_while_waiting_survives()
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Waiting);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Waiting);
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
 
     // spawning on client while waiting for init message
-    let client_entity = client_app.world.spawn(Prespawned).id();
+    let client_entity = client_app.world_mut().spawn(Prespawned).id();
     // spawn a replicated entity on server to trigger an init message
-    let _server_entity = server_app.world.spawn((Replicated, DummyComponent)).id();
+    let _server_entity = server_app.world_mut().spawn((Replicated, DummyComponent)).id();
 
     server_app.update();
     server_app.exchange_with_client(&mut client_app);
     client_app.update();
-    assert_eq!(*client_app.world.resource::<State<ClientRepairState>>(), ClientRepairState::Done);
+    assert_eq!(*client_app.world().resource::<ClientRepairState>(), ClientRepairState::Done);
 
     let unreplicated_client_entity = client_app
-        .world
+        .world_mut()
         .query_filtered::<Entity, (With<Prespawned>, Without<Replicated>, Without<DummyComponent>)>()
-        .single(&client_app.world);
-    assert_eq!(client_app.world.entities().len(), 2);
+        .single(&client_app.world());
+    assert_eq!(client_app.world().entities().len(), 2);
     assert_eq!(unreplicated_client_entity, client_entity);
 }
 
