@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.0]
+
+- Update to `bevy_replicon` v0.28.1, `bevy_cobweb` v0.12.
+
+
 ## [0.9.0]
 
 - Update to `bevy` v0.14, `bevy_replicon` v0.27.
