@@ -5,7 +5,7 @@ use crate::*;
 use bevy::ecs::component::Tick;
 use bevy::ecs::entity::MapEntities;
 use bevy::prelude::*;
-use bevy_replicon::core::{replication_registry::rule_fns::RuleFns, replication_rules::{AppRuleExt, GroupReplication}};
+use bevy_replicon::{core::replication::{replication_registry::rule_fns::RuleFns, replication_rules::GroupReplication}, prelude::AppRuleExt};
 use serde::{de::DeserializeOwned, Serialize};
 
 //standard shortcuts

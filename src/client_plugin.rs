@@ -7,7 +7,7 @@ use bevy::ecs::entity::EntityHashSet;
 use bevy::prelude::*;
 use bevy_cobweb::prelude::*;
 use bevy_replicon::client::confirm_history::ConfirmHistory;
-use bevy_replicon::client::{BufferedUpdates, ServerInitTick};
+use bevy_replicon::client::{BufferedMutations, ServerUpdateTick};
 use bevy_replicon::core::server_entity_map::ServerEntityMap;
 use bevy_replicon::prelude::*;
 
@@ -129,7 +129,7 @@ fn despawn_missing_entities(
     mut commands   : Commands,
     replicated     : Query<(Entity, &ConfirmHistory), With<Replicated>>,
     mut entity_map : ResMut<ServerEntityMap>,
-    replicon_tick  : Res<ServerInitTick>,
+    replicon_tick  : Res<ServerUpdateTick>,
 ){
     for (entity, history) in replicated.iter()
     {
@@ -150,7 +150,7 @@ fn clear_prespawn_cache(mut cached: ResMut<CachedPrespawns>)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn clear_buffered_updates(mut buffered: ResMut<BufferedUpdates>)
+fn clear_buffered_updates(mut buffered: ResMut<BufferedMutations>)
 {
     buffered.clear();
 }
@@ -185,13 +185,13 @@ fn cleanup_entity_components(
     let preinit_tick = **preinit_tick;
     for entity in replicated.iter()
     {
-        commands.add(
+        commands.queue(
             move |world: &mut World|
             {
                 let rules = world.remove_resource::<ComponentRepairRules>().unwrap();
                 for rule in rules.iter()
                 {
-                    let Some(mut entity) = world.get_entity_mut(entity) else { return; };
+                    let Ok(mut entity) = world.get_entity_mut(entity) else { return; };
                     (*rule)(&mut entity, preinit_tick);
                 }
                 world.insert_resource(rules);
@@ -350,7 +350,7 @@ impl Plugin for ClientPlugin
                 ClientRepairSet
                     .after(ClientSet::Receive)
                     .before(ClientSet::SyncHierarchy)
-                    .run_if(resource_exists::<ServerInitTick>)
+                    .run_if(resource_exists::<ServerUpdateTick>)
             )
             .add_systems(PreUpdate,
                 collect_world_change_tick
@@ -378,7 +378,7 @@ impl Plugin for ClientPlugin
                         initiate_waiting,
                     )
                         .chain()
-                        .run_if(client_just_connected.or_else(client_connecting))
+                        .run_if(client_just_connected.or(client_connecting))
                         .run_if(|s: Res<ClientRepairState>| s.in_state(ClientRepairState::Disconnected)),
                     // state: Waiting -> Repairing
                     (
@@ -386,7 +386,7 @@ impl Plugin for ClientPlugin
                     )
                         .chain()
                         .run_if(|s: Res<ClientRepairState>| s.in_state(ClientRepairState::Waiting))
-                        .run_if(resource_changed::<ServerInitTick>),
+                        .run_if(resource_changed::<ServerUpdateTick>),
                     // repair
                     // state: Repairing -> Done
                     (
